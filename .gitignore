@@ -1,0 +1,9 @@
+.claude/
+*.log
+.DS_Store
+Thumbs.db
+# Firebase コンソールに貼るルール（最初の登録ができる人のメールアドレスが入るので公開しない）
+firestore.rules
+# 設定の手順・作業メモ（公開しない）
+SETUP.md
+CLAUDE.md

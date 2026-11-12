@@ -1,0 +1,1586 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>重機 点検票</title>
+<meta name="theme-color" content="#1f3b57">
+<meta name="robots" content="noindex">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<style id="page-style"></style>
+<style>
+:root {
+  --navy: #1f3b57; --navy2: #2c5378; --bg: #f2f3ef; --card: #fff; --line: #d5d8d2; --ink: #1d2329; --sub: #5d6670;
+  --ok: #2e7d32; --ok-bg: #e6f4e7; --adj: #a85f00; --adj-bg: #fff1d6; --ng: #c62828; --ng-bg: #fde8e8; --na: #5f6b78; --na-bg: #eceef1;
+  --warn: #f2b705;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: system-ui, -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", sans-serif; line-height: 1.5; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: var(--navy2); }
+.hidden { display: none !important; }
+.muted { color: var(--sub); }
+.small { font-size: .85em; }
+.center { text-align: center; }
+#print-area { display: none; }
+
+/* ---------- 共通の部品 ---------- */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: .3em; min-height: 40px; padding: 6px 14px; border: 1px solid #b9bfc6; border-radius: 8px; background: #fff; color: var(--ink); text-decoration: none; white-space: nowrap; }
+.btn:hover { background: #f5f6f7; }
+.btn.primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btn.primary:hover { background: var(--navy2); }
+.btn.danger { color: var(--ng); border-color: #e3a5a5; }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.sm { min-height: 32px; padding: 3px 10px; font-size: .9em; }
+.msg { padding: 12px 14px; border-radius: 10px; margin: 12px 0; }
+.msg.err { background: var(--ng-bg); color: #8d1c1c; border: 1px solid #f0b8b8; }
+.msg.info { background: #e8f0f8; border: 1px solid #c3d5e8; }
+.msg.warn { background: #fff6dc; border: 1px solid #f0d58a; }
+.demo-bar { background: #fff3c4; color: #6b5200; font-size: 13px; padding: 4px 12px; text-align: center; border-bottom: 1px solid #ecd27a; }
+#toast { position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #263238; color: #fff; padding: 10px 18px; border-radius: 24px; font-size: 15px; z-index: 50; max-width: 90vw; box-shadow: 0 4px 14px rgba(0,0,0,.25); opacity: 0; pointer-events: none; transition: opacity .2s; }
+#toast.show { opacity: 1; }
+.loading { padding: 60px 20px; text-align: center; color: var(--sub); }
+.spinner { width: 34px; height: 34px; border: 4px solid #cfd6dd; border-top-color: var(--navy); border-radius: 50%; margin: 0 auto 14px; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.page-msg { max-width: 560px; margin: 40px auto; padding: 0 16px; }
+.page-msg h1 { font-size: 22px; }
+
+/* ---------- 作業員の画面（スマホ） ---------- */
+body.worker { font-size: 17px; }
+.w-wrap { max-width: 600px; margin: 0 auto; padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
+.w-head { background: var(--navy); color: #fff; padding: 14px 16px 16px; }
+.w-head .co { font-size: 13px; opacity: .8; }
+.w-head .ttl { font-size: 14px; opacity: .9; margin-top: 2px; }
+.w-head .ml { font-size: 34px; font-weight: 700; line-height: 1.2; margin-top: 4px; letter-spacing: .02em; }
+.w-head .ms { font-size: 15px; opacity: .92; }
+.w-banner { margin: 12px 12px 0; padding: 10px 14px; border-radius: 10px; font-size: 15px; }
+.w-banner.none { background: #e8f0f8; }
+.w-banner.ok { background: var(--ok-bg); color: #1b5e20; }
+.w-banner.ng { background: var(--ng-bg); color: #8d1c1c; font-weight: 600; }
+.w-card { background: var(--card); margin: 12px; border-radius: 12px; padding: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.w-field { display: block; margin-bottom: 12px; }
+.w-field:last-child { margin-bottom: 0; }
+.w-field > span { display: block; font-size: 14px; color: var(--sub); margin-bottom: 4px; }
+.w-field > span b { color: var(--ng); font-weight: 600; }
+.w-field input, .w-field textarea { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid #b9bfc6; border-radius: 8px; background: #fff; font-size: 17px; }
+.w-field textarea { min-height: 84px; resize: vertical; }
+.w-field input:focus, .w-field textarea:focus { outline: 3px solid #9cc2e8; border-color: var(--navy2); }
+.w-field.need input, .w-field.need textarea { border-color: var(--ng); background: #fff8f8; }
+.w-date { font-size: 15px; color: var(--sub); }
+.w-legend { margin: 14px 12px 0; font-size: 14px; color: var(--sub); display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.w-legend b { font-size: 16px; }
+.w-sec { margin: 12px; }
+.w-sec h2 { font-size: 15px; margin: 18px 4px 6px; color: var(--navy); display: flex; justify-content: space-between; align-items: baseline; }
+.w-item { background: var(--card); border-radius: 12px; padding: 10px 12px 12px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,.06); border: 2px solid transparent; }
+.w-item.miss { border-color: var(--ng); background: #fff8f8; }
+.w-item.v-x { border-color: var(--ng); }
+.w-item .il { font-weight: 600; font-size: 17px; }
+.w-item .ih { font-size: 13px; color: var(--sub); }
+.law { display: inline-block; font-size: 11px; font-weight: 600; color: #fff; background: #7b5ea7; border-radius: 4px; padding: 0 5px; margin-left: 6px; vertical-align: 2px; }
+.marks { display: grid; grid-template-columns: 1fr 1fr 1fr .8fr; gap: 6px; margin-top: 8px; }
+.marks button { min-height: 52px; border-radius: 10px; border: 2px solid #c3c9cf; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; padding: 4px 2px; -webkit-tap-highlight-color: transparent; }
+.marks button .s { font-size: 22px; font-weight: 700; }
+.marks button .t { font-size: 12px; color: var(--sub); }
+.marks button[data-v="o"] .s { color: var(--ok); }
+.marks button[data-v="a"] .s { color: var(--adj); }
+.marks button[data-v="x"] .s { color: var(--ng); }
+.marks button[data-v="n"] .s { color: var(--na); }
+.marks button.on[data-v="o"] { background: var(--ok); border-color: var(--ok); }
+.marks button.on[data-v="a"] { background: #d98200; border-color: #d98200; }
+.marks button.on[data-v="x"] { background: var(--ng); border-color: var(--ng); }
+.marks button.on[data-v="n"] { background: var(--na); border-color: var(--na); }
+.marks button.on .s, .marks button.on .t { color: #fff; }
+.w-ngwarn { margin: 12px; padding: 14px; border-radius: 12px; background: var(--ng); color: #fff; font-weight: 700; font-size: 17px; }
+.w-bottom { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,.97); border-top: 1px solid var(--line); padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); z-index: 20; }
+.w-bottom .in { max-width: 600px; margin: 0 auto; display: flex; gap: 10px; align-items: center; }
+.w-bottom .prog { font-size: 14px; color: var(--sub); min-width: 74px; text-align: center; line-height: 1.2; }
+.w-bottom .prog b { font-size: 20px; color: var(--ink); display: block; }
+.w-bottom .send { flex: 1; min-height: 56px; border: 0; border-radius: 12px; background: var(--navy); color: #fff; font-size: 19px; font-weight: 700; }
+.w-bottom .send:disabled { background: #8a99a8; }
+.w-done { margin: 20px 12px; text-align: center; }
+.w-done .mark { width: 92px; height: 92px; border-radius: 50%; margin: 10px auto 12px; display: flex; align-items: center; justify-content: center; font-size: 54px; color: #fff; background: var(--ok); }
+.w-done.pending .mark { background: #d98200; font-size: 40px; }
+.w-done.failed .mark { background: var(--ng); }
+.w-done h1 { font-size: 26px; margin: 0 0 6px; }
+.w-done .sum { background: var(--card); border-radius: 12px; padding: 14px; margin: 14px 0; text-align: left; font-size: 16px; }
+.w-done .sum div + div { margin-top: 4px; }
+.w-done .ngbox { background: var(--ng); color: #fff; font-weight: 700; padding: 14px; border-radius: 12px; font-size: 18px; text-align: left; }
+.w-done .btn { min-height: 52px; width: 100%; font-size: 17px; margin-top: 12px; }
+.w-foot { text-align: center; font-size: 13px; color: var(--sub); margin: 18px 12px; }
+.pick-list { margin: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.pick-list a { display: block; background: var(--card); border-radius: 10px; padding: 10px 12px; text-decoration: none; color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.pick-list a b { display: block; font-size: 20px; }
+.pick-list a span { font-size: 12px; color: var(--sub); }
+
+/* ---------- 事務所の画面（PC） ---------- */
+body.admin { font-size: 15px; }
+.a-head { background: var(--navy); color: #fff; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 10px 16px; }
+.a-head .t { font-size: 18px; font-weight: 700; }
+.a-head .t span { font-weight: 400; font-size: 13px; opacity: .8; margin-left: 6px; }
+.a-head .co { opacity: .9; }
+.a-head .u { margin-left: auto; font-size: 13px; opacity: .9; display: flex; gap: 8px; align-items: center; }
+.a-head .u .btn { min-height: 30px; background: transparent; color: #fff; border-color: rgba(255,255,255,.5); font-size: 13px; padding: 2px 10px; }
+.tabs { display: flex; gap: 2px; background: #dfe3e0; padding: 6px 12px 0; overflow-x: auto; }
+.tabs button { border: 0; background: transparent; padding: 9px 16px; border-radius: 8px 8px 0 0; font-size: 15px; color: #39434d; white-space: nowrap; }
+.tabs button.on { background: var(--bg); font-weight: 700; color: var(--navy); }
+.tabs button .cnt { display: inline-block; min-width: 20px; padding: 0 6px; border-radius: 10px; background: var(--ng); color: #fff; font-size: 12px; margin-left: 4px; }
+#a-main { padding: 14px 16px 40px; max-width: 1280px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.toolbar input[type=date], .toolbar input[type=month], .toolbar select { min-height: 40px; padding: 4px 8px; border: 1px solid #b9bfc6; border-radius: 8px; background: #fff; }
+.toolbar .sp { flex: 1; }
+.stat { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.stat div { background: var(--card); border-radius: 10px; padding: 8px 16px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.stat b { font-size: 22px; margin-right: 2px; }
+.stat .ng b { color: var(--ng); }
+.stat .ok b { color: var(--ok); }
+.tlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+.trow { background: var(--card); border-radius: 10px; padding: 10px 12px; border-left: 6px solid var(--ok); box-shadow: 0 1px 2px rgba(0,0,0,.06); cursor: pointer; }
+.trow:hover { background: #fafbfc; }
+.trow.ng { border-left-color: var(--ng); background: #fff7f7; }
+.trow.adj { border-left-color: #d98200; }
+.trow .l { font-size: 18px; font-weight: 700; }
+.trow .l .tag { font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 10px; margin-left: 6px; vertical-align: 2px; }
+.tag.ng { background: var(--ng); color: #fff; }
+.tag.adj { background: var(--adj-bg); color: var(--adj); }
+.tag.ok { background: var(--ok-bg); color: var(--ok); }
+.tag.done { background: #e3e7eb; color: #4a5560; }
+.trow .s { font-size: 13px; color: var(--sub); }
+.trow .m { font-size: 14px; margin-top: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chips span { background: #e6e9ec; border-radius: 14px; padding: 2px 10px; font-size: 13px; }
+details.none-list { margin-top: 16px; background: var(--card); border-radius: 10px; padding: 10px 14px; }
+details.none-list summary { cursor: pointer; color: var(--sub); }
+.empty { padding: 30px; text-align: center; color: var(--sub); background: var(--card); border-radius: 10px; }
+.ngcard { background: var(--card); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; border-left: 6px solid var(--ng); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.ngcard.done { border-left-color: #9aa5b1; }
+.ngcard .h { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.ngcard .h b { font-size: 18px; }
+.ngcard ul { margin: 6px 0; padding-left: 1.3em; }
+.ngcard .note { background: #f6f7f8; border-radius: 6px; padding: 6px 10px; margin: 6px 0; white-space: pre-wrap; }
+.ngcard textarea { width: 100%; min-height: 60px; border: 1px solid #b9bfc6; border-radius: 8px; padding: 6px 10px; }
+.ngcard .fixrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; align-items: center; }
+table.mtable { border-collapse: collapse; width: 100%; background: var(--card); border-radius: 10px; overflow: hidden; }
+.mtable th, .mtable td { border-bottom: 1px solid #e5e8e4; padding: 6px 8px; text-align: left; vertical-align: middle; }
+.mtable th { background: #eef0ed; font-size: 13px; color: #39434d; font-weight: 600; white-space: nowrap; }
+.mtable tr.off td { color: #9aa1a8; }
+.mtable td.lb { font-weight: 700; font-size: 16px; white-space: nowrap; }
+.mtable td .btn { margin-right: 4px; }
+.wrap-x { overflow-x: auto; }
+.set-sec { background: var(--card); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; max-width: 820px; }
+.set-sec h3 { margin: 0 0 8px; font-size: 16px; color: var(--navy); }
+.set-sec input[type=text], .set-sec input[type=email], .set-sec input[type=month] { min-height: 38px; padding: 4px 10px; border: 1px solid #b9bfc6; border-radius: 8px; }
+.set-sec ul.eds { list-style: none; padding: 0; margin: 0 0 8px; }
+.set-sec ul.eds li { display: flex; gap: 10px; align-items: center; padding: 4px 0; border-bottom: 1px dashed #e0e3e0; }
+.set-sec .url { font-family: ui-monospace, Consolas, monospace; font-size: 13px; background: #f3f5f7; padding: 6px 10px; border-radius: 6px; word-break: break-all; }
+.set-sec .qrbox { width: 140px; height: 140px; }
+.help li { margin-bottom: 4px; }
+.login-box { max-width: 460px; margin: 50px auto; background: var(--card); border-radius: 14px; padding: 24px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+.login-box h1 { font-size: 22px; margin: 0 0 6px; }
+.login-box .btn { width: 100%; min-height: 48px; font-size: 16px; margin-top: 12px; }
+.login-box label { display: block; margin-top: 12px; font-size: 14px; color: var(--sub); }
+.login-box input, .login-box textarea { display: block; width: 100%; margin-top: 4px; min-height: 40px; padding: 6px 10px; border: 1px solid #b9bfc6; border-radius: 8px; color: var(--ink); }
+.login-box textarea { min-height: 70px; }
+
+/* モーダル */
+.modal-bg { position: fixed; inset: 0; background: rgba(20,28,36,.45); z-index: 40; display: flex; align-items: flex-start; justify-content: center; padding: 30px 12px; overflow-y: auto; }
+.modal { background: #fff; border-radius: 14px; width: 100%; max-width: 620px; padding: 18px 20px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+.modal h2 { margin: 0 0 10px; font-size: 19px; padding-right: 36px; }
+.modal .x { position: absolute; right: 10px; top: 8px; border: 0; background: transparent; font-size: 26px; color: var(--sub); width: 40px; height: 40px; }
+.modal .row { display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: center; margin-bottom: 8px; }
+.modal .row > span { font-size: 14px; color: var(--sub); }
+.modal .row input, .modal .row select { min-height: 38px; padding: 4px 10px; border: 1px solid #b9bfc6; border-radius: 8px; width: 100%; }
+.modal .foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
+.dtable { width: 100%; border-collapse: collapse; margin: 8px 0; }
+.dtable td { border-bottom: 1px solid #eceeec; padding: 5px 6px; }
+.dtable td.mk { width: 70px; text-align: center; font-weight: 700; white-space: nowrap; }
+.dtable tr.sec td { background: #f1f3f1; font-size: 13px; color: var(--navy); font-weight: 600; }
+.mk-o { color: var(--ok); } .mk-a { color: var(--adj); } .mk-x { color: var(--ng); } .mk-n { color: var(--na); }
+.kv { display: grid; grid-template-columns: 100px 1fr; gap: 2px 10px; font-size: 14px; }
+.kv dt { color: var(--sub); } .kv dd { margin: 0; }
+
+/* ---------- 月の点検表（画面・印刷 共通） ---------- */
+.sheet-wrap { overflow-x: auto; background: #cfd4d8; padding: 12px; border-radius: 10px; }
+.sheet { width: 281mm; background: #fff; color: #000; padding: 0; font-family: "Yu Gothic", "Hiragino Sans", "Meiryo", sans-serif; font-size: 8pt; line-height: 1.25; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.sheet-wrap .sheet { padding: 6mm; width: calc(281mm + 12mm); margin: 0 auto 12px; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+.sheet .sh-top { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 2mm; }
+.sheet .sh-title { font-size: 14pt; font-weight: 700; letter-spacing: .05em; }
+.sheet .sh-ym { font-size: 12pt; font-weight: 700; }
+.sheet table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+.sheet .sh-info th, .sheet .sh-info td { border: .25mm solid #000; padding: .6mm 1.5mm; height: 6mm; text-align: left; font-size: 8.5pt; }
+.sheet .sh-info th { background: #eef0f2; width: 18mm; font-weight: 600; white-space: nowrap; }
+.sheet .sh-info td { font-weight: 600; }
+.sheet .sh-grid { margin-top: 2mm; }
+.sheet .sh-grid th, .sheet .sh-grid td { border: .2mm solid #000; text-align: center; padding: 0; height: 4.6mm; overflow: hidden; }
+.sheet .sh-grid thead th { background: #eef0f2; font-weight: 600; }
+.sheet .sh-grid th.secv { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: -.1em; font-weight: 600; background: #f6f7f8; font-size: 6.5pt; line-height: 1; }
+.sheet .sh-grid td.it { text-align: left; padding: 0 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 7.5pt; }
+.sheet .sh-grid .sat { color: #1550a8; } .sheet .sh-grid .sun { color: #c62828; }
+.sheet .sh-grid td.nd { background: #d9dcdf; }
+.sheet .sh-grid td.m { font-size: 9pt; font-weight: 700; }
+.sheet .sh-grid td.m.o { color: #1b5e20; } .sheet .sh-grid td.m.a { color: #a85f00; } .sheet .sh-grid td.m.x { color: #fff; background: #c62828; } .sheet .sh-grid td.m.n { color: #555; }
+.sheet .sh-grid tr.vt td { height: 16mm; vertical-align: top; }
+.sheet .sh-grid tr.vt.hr td { height: 11mm; }
+/* 縦書きは折り返さない（長い名前が2列に分かれて読めなくなるため）。名前は8文字までに縮める */
+.sheet .sh-grid tr.vt td .v { writing-mode: vertical-rl; text-orientation: upright; font-size: 7pt; line-height: 1; margin: .5mm auto 0; max-height: 15.5mm; overflow: hidden; letter-spacing: -.05em; white-space: nowrap; }
+.sheet .sh-grid tr.vt td .v.long { font-size: 5.6pt; }
+.sheet .sh-grid tr.vt td .v.num { text-orientation: mixed; letter-spacing: 0; }
+.sheet .sh-grid tr.stamp td { height: 8mm; }
+.sheet .sh-grid tr.fr th, .sheet .sh-grid tr.fr td.it { background: #f6f7f8; }
+.sheet .sh-notes { margin-top: 1.5mm; }
+.sheet .sh-notes .nh { display: flex; justify-content: space-between; align-items: baseline; gap: 4mm; font-size: 7pt; margin-bottom: .5mm; }
+.sheet .sh-notes .nh b { font-size: 8pt; }
+.sheet .sh-notes .nb { border: .25mm solid #000; min-height: 10mm; padding: 1mm 2mm; font-size: 7pt; line-height: 1.3; }
+.sheet .sh-notes .nb.cols2 { column-count: 2; column-gap: 5mm; }
+.sheet .sh-notes .nb.cols3 { column-count: 3; column-gap: 4mm; }
+.sheet .sh-notes .nb div { break-inside: avoid; }
+
+/* ---------- QRラベル（A4・名刺サイズ 91×55mm を 2列×5段） ---------- */
+.qr-page { width: 210mm; height: 297mm; padding: 11mm 14mm; display: grid; grid-template-columns: 91mm 91mm; grid-auto-rows: 55mm; align-content: start; background: #fff; color: #000; break-after: page; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.qr-page:last-child { break-after: auto; }
+.qlabel { width: 91mm; height: 55mm; display: flex; align-items: center; gap: 2.5mm; padding: 3mm 3.5mm; overflow: hidden; font-family: "Yu Gothic", "Hiragino Sans", "Meiryo", sans-serif; }
+.qr-page.cut .qlabel { outline: .2mm dashed #9aa1a8; outline-offset: -.1mm; }
+.qlabel .qimg { width: 41mm; height: 41mm; flex: none; }
+.qlabel .qimg svg { width: 100%; height: 100%; display: block; }
+.qlabel .qt { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 47mm; }
+.qlabel .q1 { font-size: 10pt; font-weight: 700; background: #1f3b57; color: #fff; padding: .6mm 2mm; border-radius: 1.2mm; text-align: center; letter-spacing: .1em; }
+.qlabel .q2 { font-size: 21pt; font-weight: 800; line-height: 1.15; margin-top: 1.5mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qlabel .q3 { font-size: 8pt; line-height: 1.3; }
+.qlabel .q4 { font-size: 7.5pt; line-height: 1.35; margin-top: auto; border-top: .2mm solid #000; padding-top: 1mm; }
+.qlabel .q5 { font-size: 7pt; color: #333; margin-top: .6mm; }
+.qprev { background: #cfd4d8; padding: 12px; border-radius: 10px; overflow-x: auto; }
+.qprev .qr-page { margin: 0 auto 12px; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+
+@media (max-width: 640px) {
+  .a-head .u { margin-left: 0; width: 100%; }
+  #a-main { padding: 12px 10px 40px; }
+  .modal .row { grid-template-columns: 1fr; gap: 2px; }
+}
+
+@media print {
+  body.printing > *:not(#print-area) { display: none !important; }
+  body.printing #print-area { display: block; }
+  body.printing { background: #fff; }
+  .sheet { break-after: page; }
+  .sheet:last-child { break-after: auto; }
+}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading"><div class="spinner"></div>読み込み中…</div></div>
+<div id="print-area"></div>
+<div id="toast"></div>
+<script>
+'use strict';
+/* =====================================================================
+   重機 点検票（juki-tenken）
+   - 重機に貼ったQRコード（?k=合言葉&m=重機ID）を読むと、その重機の始業前点検票が開く。作業員はログイン不要
+   - 事務所は引数なしのURLを開き、Google でログイン（編集できる人に登録したメールアドレスだけ）
+   FIREBASE_CONFIG が null の間は「お試しモード」（この端末のブラウザだけに保存。ログインなし）
+   Firebase は現場配置ボード（Google版）と同じプロジェクト genba-board-50494（ルールは firestore.rules を1つにまとめて公開）。
+   apiKey は公開してよい値（データはルールが守る）
+   ===================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyC4UmnWEBxo5rZk1ENlYyIisdFqJFfqR2A',
+  authDomain: 'genba-board-50494.firebaseapp.com',
+  projectId: 'genba-board-50494',
+  storageBucket: 'genba-board-50494.firebasestorage.app',
+  messagingSenderId: '637215520596',
+  appId: '1:637215520596:web:20fbbe7750fc4f980bfac1',
+};
+const FIREBASE_VERSION = '10.12.2';
+const QR_LIB_URL = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
+const SETUP_DEFAULT_NAME = '有限会社 大田原工業';
+const NET_TIMEOUT_MS = 20000;
+const SEND_WAIT_MS = 8000;
+const LS_PREFIX = 'jt_'; // この端末に覚えることは、すべて jt_ で始める（同じ github.io の住所の他のアプリと取り合わない）
+
+/* ---------- 点検の項目 ---------- */
+// law: 法定の作業開始前点検（安衛則170条：ブレーキ・クラッチ／クレーン則78条：過負荷警報など）
+const ITEMS = {
+  eng_oil:   { t: 'エンジンオイルの量・よごれ', s: 'エンジンオイルの量・よごれ', h: 'オイルゲージで確認' },
+  coolant:   { t: '冷却水の量', s: '冷却水の量', h: 'リザーブタンクの目盛り' },
+  hyd_oil:   { t: '作動油の量', s: '作動油の量', h: '作動油タンクのゲージ' },
+  fuel:      { t: '燃料の量', s: '燃料の量' },
+  leak:      { t: '油・水のもれ', s: '油・水のもれ', h: 'エンジンまわり・ホース・シリンダ・機械の下' },
+  start:     { t: 'エンジンのかかり・異音・排気の色', s: 'エンジンのかかり・異音・排気色' },
+  meters:    { t: '計器・警告灯', s: '計器・警告灯', h: 'エンジンをかけた後、警告灯が消えるか' },
+  brake_ex:  { t: '走行ブレーキ・旋回ブレーキの効き', s: '走行・旋回ブレーキの効き', law: 1 },
+  brake_wl:  { t: '走行ブレーキ・駐車ブレーキの効き', s: '走行・駐車ブレーキの効き', law: 1 },
+  levers:    { t: '操作レバー・ペダルの動き（クラッチ・操作装置）', s: '操作レバー・ペダル（クラッチ）', h: '動き・戻り・ガタ', law: 1 },
+  lock:      { t: '安全ロックレバー（ゲートロック）', s: '安全ロックレバー', h: 'レバーを上げると操作が効かなくなるか' },
+  steer:     { t: 'ハンドル（ステアリング）の効き', s: 'ハンドルの効き' },
+  work_ex:   { t: '作業装置の動き（ブーム・アーム・バケット・旋回）', s: '作業装置・旋回の動き' },
+  work_dm:   { t: '作業装置の動き（ブーム・アーム・アタッチメント・旋回）', s: '作業装置・旋回の動き' },
+  work_wl:   { t: '作業装置の動き（バケットの上げ下げ・傾け）', s: '作業装置（バケット）の動き' },
+  track:     { t: '履帯（クローラ）の張り・きず', s: '履帯の張り・きず', h: 'たるみ・切れ・シューのボルト' },
+  boom:      { t: 'ブーム・アームの亀裂・ピン・抜け止め', s: 'ブーム・アームの亀裂・ピン' },
+  tooth:     { t: 'バケット・爪（ツース）のきず・ゆるみ', s: 'バケット・爪のきず・ゆるみ' },
+  dm_att:    { t: '解体アタッチメントのきず・ボルト・ホース', s: 'アタッチメントのきず・ボルト', h: 'つかみ機・カッタなど' },
+  tire:      { t: 'タイヤの空気圧・きず・ホイールナット', s: 'タイヤ空気圧・きず・ナット' },
+  bucket_wl: { t: 'バケット・リンクの亀裂・ピン', s: 'バケット・リンクの亀裂・ピン' },
+  drum:      { t: 'ドラム・タイヤのきず・付着物', s: 'ドラム・タイヤのきず' },
+  sprinkle:  { t: '散水装置（タンクの水・散水の出かた）', s: '散水装置' },
+  vib:       { t: '振動装置の入り切り', s: '振動装置の入り切り' },
+  scraper:   { t: 'スクレーパ（泥落とし）', s: 'スクレーパ' },
+  horn:      { t: 'ホーン・走行警報ブザー', s: 'ホーン・走行警報ブザー' },
+  lights:    { t: 'ライト（前照灯・作業灯）', s: 'ライト' },
+  mirror:    { t: 'ミラー・後方カメラの見え方', s: 'ミラー・後方カメラ', h: '割れ・汚れ・向き' },
+  belt:      { t: 'シートベルト', s: 'シートベルト', h: 'きず・バックルの留まり' },
+  guard:     { t: 'ヘッドガード・前面ガード', s: 'ヘッドガード・前面ガード', h: '落ちてくる物・飛んでくる物から守る囲い' },
+  crane_mode:{ t: 'クレーン・ショベルのモード切り替えと表示', s: 'クレーン／ショベル切替・表示' },
+  overload:  { t: '過負荷防止装置・警報（モーメントリミッタ）', s: '過負荷防止装置・警報', h: 'ブザー・表示が正しく出るか', law: 1 },
+  hook:      { t: 'フックの外れ止め・きず', s: 'フックの外れ止め' },
+};
+const SEC_ENGINE = ['エンジン・油脂', ['eng_oil', 'coolant', 'hyd_oil', 'fuel', 'leak', 'start', 'meters']];
+// 点検票の種類。項目を変えたら v を1つ上げる（記録に残る。過去の記録は表示のとき項目キーで突き合わせる）
+const FORMS = {
+  ex:  { name: '油圧ショベル', v: 1, secs: [
+    SEC_ENGINE,
+    ['ブレーキ・操作', ['brake_ex', 'levers', 'lock', 'work_ex']],
+    ['足回り・作業装置', ['track', 'boom', 'tooth']],
+    ['安全装置', ['horn', 'lights', 'mirror', 'belt']],
+  ] },
+  exc: { name: '油圧ショベル（クレーン仕様）', v: 1, secs: [
+    SEC_ENGINE,
+    ['ブレーキ・操作', ['brake_ex', 'levers', 'lock', 'work_ex']],
+    ['足回り・作業装置', ['track', 'boom', 'tooth']],
+    ['安全装置', ['horn', 'lights', 'mirror', 'belt']],
+    ['クレーン機能', ['crane_mode', 'overload', 'hook']],
+  ] },
+  dm:  { name: '解体機', v: 1, secs: [
+    SEC_ENGINE,
+    ['ブレーキ・操作', ['brake_ex', 'levers', 'lock', 'work_dm']],
+    ['足回り・作業装置', ['track', 'boom', 'dm_att']],
+    ['安全装置', ['horn', 'lights', 'mirror', 'belt', 'guard']],
+  ] },
+  wl:  { name: 'タイヤショベル', v: 1, secs: [
+    SEC_ENGINE,
+    ['ブレーキ・操作', ['brake_wl', 'steer', 'levers', 'work_wl']],
+    ['足回り・作業装置', ['tire', 'bucket_wl']],
+    ['安全装置', ['horn', 'lights', 'mirror', 'belt']],
+  ] },
+  rl:  { name: 'ローラー', v: 1, secs: [
+    SEC_ENGINE,
+    ['ブレーキ・操作', ['brake_wl', 'steer', 'levers']],
+    ['足回り・作業装置', ['drum', 'sprinkle', 'vib', 'scraper']],
+    ['安全装置', ['horn', 'lights', 'belt']],
+  ] },
+};
+const MARKS = {
+  o: { s: '○', t: '良い', long: '良い' },
+  a: { s: '△', t: '調整した', long: '調整・補充した' },
+  x: { s: '×', t: '悪い', long: '悪い（使えない）' },
+  n: { s: '－', t: 'ついてない', long: 'その装置が付いていない' },
+};
+const MARK_ORDER = ['o', 'a', 'x', 'n'];
+
+/* ---------- 重機の初期一覧（現場配置ボードの重機タブ 49台。2026-11-11） ----------
+   会社を登録したときにクラウドへ入れる。そのあとの追加・変更は「重機・QR」タブで行う（ここを直しても登録済みの一覧は変わらない） */
+const SEED_MACHINES = [
+  { id: 'n1', label: '① 0.7', type: '油圧ショベル', mfr: 'コマツ', model: 'PC200-10', form: 'ex' },
+  { id: 'n2', label: '② 0.7', type: '油圧ショベル', mfr: 'CAT', model: '320-07 GLCT6', form: 'ex' },
+  { id: 'n3', label: '③ 0.7', type: '油圧ショベル', mfr: 'コマツ', model: 'PC200-11', form: 'ex' },
+  { id: 'n4', label: '④ 0.2', type: '油圧ショベル', mfr: 'CAT', model: '050ESR', form: 'ex' },
+  { id: 'n5', label: '⑤ 0.1', type: '油圧ショベル', mfr: 'CAT', model: '303CSR', form: 'ex' },
+  { id: 'n6', label: '⑥ 0.15', type: '油圧ショベル', mfr: 'CAT', model: '040ESR-MR3T', form: 'ex' },
+  { id: 'n7', label: '⑦ 0.1', type: '解体機', mfr: '日立', model: 'ZX30U-5A', form: 'dm' },
+  { id: 'n8', label: '⑧ 0.2', type: '油圧ショベル', mfr: 'コマツ', model: 'PC58UU-5', form: 'ex' },
+  { id: 'n9', label: '⑨ 0.2', type: '油圧ショベル', mfr: 'CAT', model: '050SR', form: 'ex' },
+  { id: 'n10', label: '⑩ 0.25', type: '油圧ショベル', mfr: 'コマツ', model: 'PC78US-8', form: 'ex' },
+  { id: 'n11', label: '⑪ 0.07', type: 'ミニショベル', mfr: 'コマツ', model: 'PC20UU-5', form: 'ex' },
+  { id: 'n12', label: '⑫ 0.25', type: '油圧ショベル', mfr: 'コマツ', model: 'PC78US-10', form: 'ex' },
+  { id: 'n13', label: '⑬ 0.45', type: '油圧ショベル', mfr: '住友', model: 'SH135X-7', form: 'ex' },
+  { id: 'n14', label: '⑭ 0.5', type: 'タイヤショベル', mfr: 'コマツ', model: 'WA50-6', form: 'wl' },
+  { id: 'n15', label: '⑮ 0.45', type: '解体機', mfr: 'コマツ', model: 'PC138US-11', form: 'dm' },
+  { id: 'n16', label: '⑯ 0.1', type: '油圧ショベル（クレーン仕様）', mfr: '日立', model: 'ZX30B-5B', form: 'exc' },
+  { id: 'n17', label: '⑰ 0.1', type: '油圧ショベル', mfr: 'ヤンマー', model: 'B30U', form: 'ex' },
+  { id: 'n18', label: '⑱ 0.2', type: '油圧ショベル', mfr: 'コマツ', model: 'PC58UU-6', form: 'ex' },
+  { id: 'n19', label: '⑲ 0.15', type: '油圧ショベル', mfr: 'ヤンマー', model: 'B40U', form: 'ex' },
+  { id: 'n20', label: '⑳ 0.4', type: 'タイヤショベル', mfr: 'ヤンマー', model: 'V5-1', form: 'wl' },
+  { id: 'n21', label: '㉑ 0.15', type: '油圧ショベル（クレーン仕様）', mfr: 'コマツ', model: 'PC38UU-5', form: 'exc' },
+  { id: 'n22', label: '㉒ 0.2', type: '解体機', mfr: 'コマツ', model: 'PC55MR-3', form: 'dm' },
+  { id: 'n23', label: '㉓ 0.1', type: '油圧ショベル', mfr: 'CAT', model: '030ESR-MR3TN', form: 'ex' },
+  { id: 'n24', label: '㉔ 0.15', type: '油圧ショベル', mfr: 'コマツ', model: 'PC38UU-5', form: 'ex' },
+  { id: 'n25', label: '㉕ 0.1', type: '油圧ショベル', mfr: 'コマツ', model: 'PC30UUC-6', form: 'ex' },
+  { id: 'n26', label: '㉖ 0.2', type: '解体機', mfr: 'ヤンマー', model: 'VIO55-6A', form: 'dm' },
+  { id: 'n28', label: '㉘ 0.1', type: '油圧ショベル', mfr: 'コマツ', model: 'PC30UU-5', form: 'ex' },
+  { id: 'n29', label: '㉙ 0.2', type: '油圧ショベル', mfr: 'コマツ', model: 'PC58UU-5', form: 'ex' },
+  { id: 'n31', label: '㉛ 0.15', type: '油圧ショベル', mfr: 'コマツ', model: 'PC38UU-5', form: 'ex' },
+  { id: 'n32', label: '㉜ 0.45', type: '油圧ショベル', mfr: 'CAT', model: '313CSR-PMZ-T5', form: 'ex' },
+  { id: 'n33', label: '㉝ 0.15', type: '油圧ショベル', mfr: 'ヤンマー', model: 'VIO40-2', form: 'ex' },
+  { id: 'n34', label: '㉞ 0.1', type: '油圧ショベル', mfr: 'コマツ', model: 'PC30UU-5', form: 'ex' },
+  { id: 'n36', label: '㊱ 0.1', type: '油圧ショベル（クレーン仕様）', mfr: 'ヤンマー', model: 'B30U', form: 'exc' },
+  { id: 'n37', label: '㊲ 0.45', type: '油圧ショベル', mfr: '日立', model: 'ZX135US-6', form: 'ex' },
+  { id: 'n38', label: '㊳ 0.25', type: '油圧ショベル（クレーン仕様）', mfr: '日立', model: 'ZX75UR-5B', form: 'exc' },
+  { id: 'n39', label: '㊴ 0.25', type: '油圧ショベル（クレーン仕様）', mfr: 'コマツ', model: 'PC78UU-8', form: 'exc' },
+  { id: 'n40', label: '㊵ 0.2', type: '油圧ショベル', mfr: 'ヤンマー', model: 'B60U', form: 'ex' },
+  { id: 'n41', label: '㊶ 0.1', type: '油圧ショベル（クレーン仕様）', mfr: '日立', model: 'ZX30UR-3', form: 'exc' },
+  { id: 'n42', label: '㊷ 2.5', type: 'コンバインドローラー', mfr: '日立', model: 'ZC35C', form: 'rl' },
+  { id: 'n43', label: '㊸ 1.0', type: 'タイヤショベル', mfr: '日立', model: 'ZW80S-5B', form: 'wl' },
+  { id: 'n44', label: '㊹ 0.45', type: '油圧ショベル（クレーン仕様）', mfr: 'CAT', model: '315GC-07-GMCT5S', form: 'exc' },
+  { id: 'n45', label: '㊺ 0.2', type: '油圧ショベル（クレーン仕様）', mfr: 'CAT', model: '305SR-07-MS4TSC', form: 'exc' },
+  { id: 'n46', label: '㊻ 0.1', type: '油圧ショベル（クレーン仕様）', mfr: 'CAT', model: '303SR-07-MS3TSC', form: 'exc' },
+  { id: 'n47', label: '㊼ 0.1', type: '油圧ショベル（クレーン仕様）', mfr: 'クボタ', model: 'RX306S2', form: 'exc' },
+  { id: 'n48', label: '㊽ 0.1', type: '油圧ショベル（クレーン仕様）', mfr: 'クボタ', model: 'RX306S2', form: 'exc' },
+  { id: 'n49', label: '㊾ 0.1', type: '油圧ショベル（クレーン仕様）', mfr: 'クボタ', model: 'RX306S2', form: 'exc' },
+  { id: 'r1', label: 'キナン 0.2', type: '油圧ショベル（レンタル）', mfr: '', model: '', form: 'ex' },
+  { id: 'r2', label: 'キナン 0.45', type: '油圧ショベル（レンタル）', mfr: '', model: '', form: 'ex' },
+  { id: 'x1', label: '1tローラー', type: 'ローラー', mfr: '', model: '', form: 'rl' },
+];
+
+/* =====================================================================
+   小さな道具
+   ===================================================================== */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+const pad = (n) => String(n).padStart(2, '0');
+// 日付はかならず端末の暦で扱う（toISOString は UTC なので朝9時前に前の日になる）
+function ymd(d = new Date()) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function hm(d = new Date()) { return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+function parseYmd(s) { const a = String(s).split('-').map(Number); return new Date(a[0], a[1] - 1, a[2]); }
+function addDaysStr(s, n) { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); }
+function addMonthsStr(ym, n) { const a = ym.split('-').map(Number); const d = new Date(a[0], a[1] - 1 + n, 1); return d.getFullYear() + '-' + pad(d.getMonth() + 1); }
+const DOW = '日月火水木金土';
+function jpDate(s) { const d = parseYmd(s); return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日（' + DOW[d.getDay()] + '）'; }
+function mdw(s) { const d = parseYmd(s); return (d.getMonth() + 1) + '/' + d.getDate() + '（' + DOW[d.getDay()] + '）'; }
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+function clone(o) { return JSON.parse(JSON.stringify(o)); }
+function isCode(e, code) { return !!e && (e.code === code || e.code === 'firestore/' + code); }
+function withTimeout(p, ms) {
+  let t; const to = new Promise((_, rej) => { t = setTimeout(() => rej(Object.assign(new Error('timeout'), { code: 'timeout' })), ms); });
+  return Promise.race([p, to]).finally(() => clearTimeout(t));
+}
+function toMs(v) { if (!v) return 0; if (typeof v === 'number') return v; if (typeof v.toMillis === 'function') return v.toMillis(); return 0; }
+function lsGet(k, def) { try { const v = localStorage.getItem(LS_PREFIX + k); return v == null ? def : JSON.parse(v); } catch (e) { return def; } }
+function lsSet(k, v) { try { localStorage.setItem(LS_PREFIX + k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+function lsDel(k) { try { localStorage.removeItem(LS_PREFIX + k); } catch (e) { /* なにもしない */ } }
+function normEmail(s) { return String(s || '').trim().toLowerCase(); }
+function randId(n) { const c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'; const a = new Uint8Array(n); crypto.getRandomValues(a); return Array.from(a, (x) => c[x % c.length]).join(''); }
+function errText(e) {
+  if (isCode(e, 'permission-denied')) return '権限がありません';
+  if (isCode(e, 'unavailable') || isCode(e, 'timeout')) return '通信できません（電波・ネットを確認してください）';
+  if (isCode(e, 'not-found')) return '見つかりません';
+  return (e && (e.message || e.code)) || String(e);
+}
+let toastTimer = 0;
+function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms); }
+function appUrl() { return location.origin + location.pathname; }
+function machineUrl(tk, mid) { return appUrl() + '?k=' + encodeURIComponent(tk) + '&m=' + encodeURIComponent(mid); }
+function entranceUrl(tk) { return appUrl() + '?k=' + encodeURIComponent(tk); }
+function findMachine(co, mid) { return ((co && co.machines) || []).find((m) => m.id === mid) || null; }
+function machineSub(m) { return [m.type, [m.mfr, m.model].filter(Boolean).join(' ')].filter(Boolean).join('　'); }
+function formOf(key) { return FORMS[key] || FORMS.ex; }
+function formKeys(key) { return formOf(key).secs.flatMap((s) => s[1]); }
+function itemText(k) { return ITEMS[k] ? ITEMS[k].t : k; }
+function itemShort(k) { return ITEMS[k] ? (ITEMS[k].s || ITEMS[k].t) : k; }
+// 月の点検表（縦書きの欄）に載せる短い区分名
+const SEC_SHORT = { 'エンジン・油脂': 'エンジン', 'ブレーキ・操作': 'ブレーキ操作', '足回り・作業装置': '足回り', '安全装置': '安全装置', 'クレーン機能': 'クレーン', 'その他': 'その他' };
+function recKey(r) { return (r.date || '') + ' ' + (r.t || '') + ' ' + String(r.at || 0).padStart(15, '0'); }
+function sortRecs(a) { return a.sort((x, y) => (recKey(x) < recKey(y) ? -1 : recKey(x) > recKey(y) ? 1 : 0)); }
+// 点検日より後の日に届いた記録（圏外で送信が遅れた・後から入力した）なら、届いた日時を返す
+function lateText(r) { if (!r.at) return ''; const d = new Date(r.at); return ymd(d) !== r.date ? (d.getMonth() + 1) + '/' + d.getDate() + ' ' + hm(d) : ''; }
+function countMarks(res) { const c = { o: 0, a: 0, x: 0, n: 0 }; Object.values(res || {}).forEach((v) => { if (c[v] != null) c[v]++; }); return c; }
+function slimCo(co) { return { name: co.name, machines: co.machines || [], mids: co.mids || [] }; }
+function loadScript(src) {
+  return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('部品を読み込めませんでした: ' + src)); document.head.appendChild(s); });
+}
+let qrLibP = null;
+function loadQrLib() { if (window.qrcode) return Promise.resolve(); if (!qrLibP) qrLibP = loadScript(QR_LIB_URL).catch((e) => { qrLibP = null; throw e; }); return qrLibP; }
+// QRコードを SVG で作る（誤り訂正 Q＝汚れ・欠けに強め。まわりに白い余白4マス）
+function qrSvg(text) {
+  const qr = window.qrcode(0, 'Q'); qr.addData(text); qr.make();
+  const n = qr.getModuleCount(); let d = '';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += 'M' + c + ' ' + r + 'h1v1h-1z';
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -4 ' + (n + 8) + ' ' + (n + 8) + '" shape-rendering="crispEdges"><rect x="-4" y="-4" width="' + (n + 8) + '" height="' + (n + 8) + '" fill="#fff"/><path d="' + d + '" fill="#000"/></svg>';
+}
+
+/* =====================================================================
+   データの置き場所（Backend）
+   Fire＝Firebase（Firestore）／Demo＝お試し（この端末の localStorage）。同じ形の関数を持つ
+   ===================================================================== */
+const Fire = {
+  isDemo: false, A: null, F: null, auth: null, db: null, _p: null, _pa: null,
+  init(withAuth) {
+    if (!this._p) {
+      this._p = (async () => {
+        const base = 'https://www.gstatic.com/firebasejs/' + FIREBASE_VERSION + '/';
+        const [app, fs] = await Promise.all([import(base + 'firebase-app.js'), import(base + 'firebase-firestore.js')]);
+        this.F = fs;
+        this.app = app.initializeApp(FIREBASE_CONFIG);
+        this.db = fs.getFirestore(this.app);
+        this.importFailed = false;
+      })().catch((e) => { this._p = null; this.importFailed = true; throw e; });
+    }
+    if (!withAuth) return this._p;
+    if (!this._pa) {
+      this._pa = this._p.then(async () => {
+        this.A = await import('https://www.gstatic.com/firebasejs/' + FIREBASE_VERSION + '/firebase-auth.js');
+        this.auth = this.A.getAuth(this.app);
+        this.importFailed = false;
+      }).catch((e) => { this._pa = null; this.importFailed = true; throw e; });
+    }
+    return this._pa;
+  },
+  newId() { return this.F.doc(this.F.collection(this.db, 'tenken')).id; },
+  async getCompany(tk) {
+    const s = await this.F.getDoc(this.F.doc(this.db, 'tenken', tk));
+    return s.exists() ? s.data() : null;
+  },
+  async getLast(tk, mid) {
+    const s = await this.F.getDoc(this.F.doc(this.db, 'tenken', tk, 'last', mid));
+    return s.exists() ? s.data() : null;
+  },
+  // 記録1件と「この重機の最後の点検」を、1回のまとめ書きで送る（ルール：記録は作るだけ。last は同じ記録と一緒の時だけ書ける）。
+  // last が null の時は記録だけ（ほかのスマホがもっと新しい点検を送っていた時）
+  submit(tk, rid, rec, last) {
+    const F = this.F, db = this.db, b = F.writeBatch(db);
+    b.set(F.doc(db, 'tenken', tk, 'records', rid), Object.assign({}, rec, { at: F.serverTimestamp() }));
+    if (last) b.set(F.doc(db, 'tenken', tk, 'last', rec.mid), Object.assign({}, last, { at: F.serverTimestamp() }));
+    return b.commit();
+  },
+  // 送った記録がサーバーにあるか。ルールは「無い記録」の get だけをだれにでも許すので、
+  // 断られた（permission-denied）＝ある／無いと返った＝ない。通信できなければ例外
+  async recordExists(tk, rid) {
+    try { const s = await this.F.getDocFromServer(this.F.doc(this.db, 'tenken', tk, 'records', rid)); return s.exists(); }
+    catch (e) { if (isCode(e, 'permission-denied')) return true; throw e; }
+  },
+  onAuth(cb) {
+    return this.A.onAuthStateChanged(this.auth, (u) => cb(u ? { email: normEmail(u.email), name: u.displayName || '' } : null));
+  },
+  login() { const p = new this.A.GoogleAuthProvider(); p.setCustomParameters({ prompt: 'select_account' }); return this.A.signInWithPopup(this.auth, p); },
+  logout() { return this.A.signOut(this.auth); },
+  async findMyCompanies(email) {
+    const F = this.F;
+    const snap = await F.getDocsFromServer(F.query(F.collection(this.db, 'tenkenAcl'), F.where('editors', 'array-contains', email), F.limit(10)));
+    return snap.docs.map((d) => d.id);
+  },
+  // 会社を登録できる人か（現場配置ボードGoogle版と同じ config/setup。ルールの setupUser() の人だけ読める）
+  async canSetup() {
+    try { await this.F.getDocFromServer(this.F.doc(this.db, 'config', 'setup')); return true; }
+    catch (e) { if (isCode(e, 'permission-denied')) return false; throw e; }
+  },
+  async companyExists(tk) { const s = await this.F.getDocFromServer(this.F.doc(this.db, 'tenken', tk)); return s.exists(); },
+  async createCompany(tk, name, editors, machines) {
+    const F = this.F, db = this.db, b = F.writeBatch(db);
+    b.set(F.doc(db, 'tenken', tk), { name, createdAt: F.serverTimestamp(), updatedAt: F.serverTimestamp(), machines, mids: machines.map((m) => m.id) });
+    b.set(F.doc(db, 'tenkenAcl', tk), { editors });
+    await b.commit();
+  },
+  // 会社（名前・重機の一覧）を変える。かならずサーバーの最新を読んでから mutate で1か所だけ変える（トランザクション）。
+  // 開きっぱなしの古い画面の一覧で、ほかの人が足した重機を消さないため
+  async updateCompany(tk, mutate) {
+    const F = this.F, ref = F.doc(this.db, 'tenken', tk);
+    return F.runTransaction(this.db, async (tx) => {
+      const s = await tx.get(ref);
+      if (!s.exists()) throw Object.assign(new Error('会社の登録が見つかりません'), { code: 'not-found' });
+      const cur = s.data();
+      const next = mutate({ name: cur.name, machines: clone(cur.machines || []) });
+      const mids = next.machines.map((m) => m.id);
+      tx.update(ref, { name: next.name, machines: next.machines, mids, updatedAt: F.serverTimestamp() });
+      return { name: next.name, machines: next.machines, mids };
+    });
+  },
+  async listRecords(tk, field, value) {
+    const F = this.F;
+    const snap = await F.getDocsFromServer(F.query(F.collection(this.db, 'tenken', tk, 'records'), F.where(field, '==', value)));
+    return snap.docs.map((d) => { const x = d.data(); return Object.assign({}, x, { id: d.id, at: toMs(x.at), fixAt: toMs(x.fixAt) }); });
+  },
+  async updateFix(tk, rid, fix) {
+    await this.F.updateDoc(this.F.doc(this.db, 'tenken', tk, 'records', rid), Object.assign({}, fix, { fixAt: this.F.serverTimestamp() }));
+  },
+  async deleteRecord(tk, rid) { await this.F.deleteDoc(this.F.doc(this.db, 'tenken', tk, 'records', rid)); },
+  async getAcl(tk) { const s = await this.F.getDocFromServer(this.F.doc(this.db, 'tenkenAcl', tk)); return s.exists() ? (s.data().editors || []) : []; },
+  // 編集できる人の一覧を、サーバーの最新に対して mutate で変える（トランザクション）
+  async updateAcl(tk, mutate) {
+    const F = this.F, ref = F.doc(this.db, 'tenkenAcl', tk);
+    return F.runTransaction(this.db, async (tx) => {
+      const s = await tx.get(ref);
+      const editors = mutate(s.exists() ? (s.data().editors || []).slice() : []);
+      tx.set(ref, { editors });
+      return editors;
+    });
+  },
+};
+
+// お試し：本物と同じ約束ごと（記録は作るだけ・圏外の間は返事を待ち続ける）をまねる。window.jtDemo.offline=true で圏外
+window.jtDemo = window.jtDemo || { offline: false };
+const DEMO_DB = 'demo_db';
+const Demo = {
+  isDemo: true,
+  _db() { const d = lsGet(DEMO_DB, null); return d && d.co ? d : { co: {}, acl: {}, rec: {}, last: {} }; },
+  _put(d) { if (!lsSet(DEMO_DB, d)) throw new Error('この端末に保存できませんでした（容量がいっぱい）'); },
+  async _wait() { await sleep(150); if (window.jtDemo.offline) throw Object.assign(new Error('お試し：圏外'), { code: 'unavailable' }); },
+  _perm() { return Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' }); },
+  init() { return Promise.resolve(); },
+  newId() { return randId(20); },
+  async getCompany(tk) { await this._wait(); const c = this._db().co[tk]; return c ? clone(c) : null; },
+  async getLast(tk, mid) { await this._wait(); const l = (this._db().last[tk] || {})[mid]; return l ? clone(l) : null; },
+  submit(tk, rid, rec, last) {
+    return (async () => {
+      while (window.jtDemo.offline) await sleep(400);
+      await sleep(250);
+      const d = this._db();
+      const co = d.co[tk];
+      if (!co || !(co.mids || []).includes(rec.mid)) throw this._perm();
+      d.rec[tk] = d.rec[tk] || {};
+      if (d.rec[tk][rid]) throw this._perm();
+      // ルールと同じ：last は日時が同じか後の点検でしか上書きできない（今より30分以上先の last は上書きしてよい）
+      const old = (d.last[tk] || {})[rec.mid];
+      if (last && old) {
+        const k = (x) => x.date + ' ' + x.t; const soon = new Date(Date.now() + 30 * 60000);
+        if (k(last) < k(old) && k(old) <= ymd(soon) + ' ' + hm(soon)) throw this._perm();
+      }
+      const now = Date.now();
+      d.rec[tk][rid] = Object.assign(clone(rec), { at: now });
+      d.last[tk] = d.last[tk] || {};
+      if (last) d.last[tk][rec.mid] = Object.assign(clone(last), { at: now });
+      this._put(d);
+    })();
+  },
+  async recordExists(tk, rid) { await this._wait(); return !!(this._db().rec[tk] || {})[rid]; },
+  onAuth(cb) { setTimeout(() => cb({ email: 'demo@example.com', name: 'お試し' }), 0); return () => {}; },
+  login() { return Promise.resolve(); },
+  logout() { toast('お試しモードではログアウトはありません'); return Promise.resolve(); },
+  async findMyCompanies(email) { await this._wait(); const d = this._db(); return Object.keys(d.acl).filter((k) => (d.acl[k].editors || []).includes(email)); },
+  async canSetup() { return true; },
+  async companyExists(tk) { await this._wait(); return !!this._db().co[tk]; },
+  async createCompany(tk, name, editors, machines) {
+    await this._wait(); const d = this._db(); const now = Date.now();
+    d.co[tk] = { name, createdAt: now, updatedAt: now, machines: clone(machines), mids: machines.map((m) => m.id) };
+    d.acl[tk] = { editors: editors.slice() }; this._put(d);
+  },
+  async updateCompany(tk, mutate) {
+    await this._wait(); const d = this._db(); const cur = d.co[tk]; if (!cur) throw this._perm();
+    const next = mutate({ name: cur.name, machines: clone(cur.machines || []) });
+    Object.assign(cur, { name: next.name, machines: next.machines, mids: next.machines.map((m) => m.id), updatedAt: Date.now() }); this._put(d);
+    return { name: cur.name, machines: clone(cur.machines), mids: cur.mids.slice() };
+  },
+  async listRecords(tk, field, value) {
+    await this._wait(); const r = this._db().rec[tk] || {};
+    return Object.keys(r).filter((id) => r[id][field] === value).map((id) => Object.assign({}, r[id], { id }));
+  },
+  async updateFix(tk, rid, fix) {
+    await this._wait(); const d = this._db(); const r = (d.rec[tk] || {})[rid];
+    if (!r) throw Object.assign(new Error('not found'), { code: 'not-found' });
+    Object.assign(r, clone(fix), { fixAt: Date.now() }); this._put(d);
+  },
+  async deleteRecord(tk, rid) { await this._wait(); const d = this._db(); if (d.rec[tk]) delete d.rec[tk][rid]; this._put(d); },
+  async getAcl(tk) { await this._wait(); const a = this._db().acl[tk]; return a ? a.editors.slice() : []; },
+  async updateAcl(tk, mutate) {
+    await this._wait(); const d = this._db(); const editors = mutate(d.acl[tk] ? d.acl[tk].editors.slice() : []);
+    d.acl[tk] = { editors: editors.slice() }; this._put(d); return editors;
+  },
+};
+const B = FIREBASE_CONFIG ? Fire : Demo;
+
+/* =====================================================================
+   送信待ちの記録（電波が無くても消えないように、送る前にこの端末に書いておく）
+   - 送れたら消す。ページを開き直したとき・電波が戻ったとき・30秒ごとに残りを送る
+   - 端末に書けなかった時（容量いっぱい等）は、このページを開いている間だけメモリに持つ
+   - ルールが「作るだけ」なので、前に届いていた記録を送り直すと断られる。断られたら、サーバーにその記録があるか
+     確かめる（1件の get は許してある）：ある＝届いていた／ない＝本当に断られた → 「送れなかった点検」に移して画面に出す
+   ===================================================================== */
+const OUTBOX = 'outbox';
+const FAILED = 'failed';
+const inflight = new Map();
+const memOutbox = new Map();
+function outboxStored() { const a = lsGet(OUTBOX, []); return Array.isArray(a) ? a : []; }
+function outboxLoad() { const a = outboxStored(); memOutbox.forEach((it) => { if (!a.some((x) => x.rid === it.rid)) a.push(it); }); return a; }
+function outboxPut(item) { memOutbox.set(item.rid, item); const a = outboxStored().filter((x) => x.rid !== item.rid); a.push(item); return lsSet(OUTBOX, a); }
+function outboxRemove(rid) { memOutbox.delete(rid); lsSet(OUTBOX, outboxStored().filter((x) => x.rid !== rid)); }
+function failedLoad() { const a = lsGet(FAILED, []); return Array.isArray(a) ? a : []; }
+function failedAdd(item) { lsSet(FAILED, failedLoad().concat([{ tk: item.tk, rid: item.rid, rec: item.rec, at: Date.now() }]).slice(-20)); }
+// 送れなかった記録の「点検済み」表示を、この端末から戻す
+function dropLocalLast(item) {
+  const k = lastKey(item.tk, item.rec.mid); const cur = lsGet(k, null);
+  if (cur && cur.date === item.last.date && cur.t === item.last.t) { if (item.prevLast) lsSet(k, item.prevLast); else lsDel(k); }
+}
+function sendItem(item) {
+  if (inflight.has(item.rid)) return inflight.get(item.rid);
+  item.tries = (item.tries || 0) + 1;
+  if (memOutbox.has(item.rid) || outboxStored().some((x) => x.rid === item.rid)) outboxPut(item);
+  const p = (async () => {
+    await B.init(false);
+    // 遅れて届いた古い点検で「最後の点検」を巻き戻さない（ほかのスマホがもっと新しい点検を送っていたら last は書かない）
+    let last = item.last;
+    try {
+      const cur = await withTimeout(B.getLast(item.tk, item.rec.mid), 5000);
+      // この端末の今より先の時刻の last（時計の狂った端末・いたずら）は無視して書く
+      const soon = new Date(Date.now() + 10 * 60000);
+      const curKey = cur ? cur.date + ' ' + cur.t : '';
+      if (cur && curKey > (last.date + ' ' + last.t) && curKey <= ymd(soon) + ' ' + hm(soon)) last = null;
+    } catch (e) { /* 分からない時は書く */ }
+    const send = (withLast) => B.submit(item.tk, item.rid, item.rec, withLast ? Object.assign({}, last, { rid: item.rid }) : null);
+    try {
+      await send(!!last);
+    } catch (e) {
+      if (!isCode(e, 'permission-denied')) throw e;
+      let exists = await withTimeout(B.recordExists(item.tk, item.rid), NET_TIMEOUT_MS); // 確かめられなければ例外 → あとで送り直す
+      if (!exists && last) {
+        // 「最後の点検」の方がもっと新しくなっていた（ルールで断られた）かもしれない → 記録だけ送り直す
+        try { await send(false); exists = true; }
+        catch (e2) { if (!isCode(e2, 'permission-denied')) throw e2; exists = await withTimeout(B.recordExists(item.tk, item.rid), NET_TIMEOUT_MS); }
+      }
+      if (!exists) {
+        outboxRemove(item.rid); failedAdd(item); dropLocalLast(item);
+        throw Object.assign(new Error('送れませんでした（登録されていない重機など）'), { code: 'rejected' });
+      }
+    }
+    outboxRemove(item.rid);
+    return 'sent';
+  })().finally(() => inflight.delete(item.rid));
+  inflight.set(item.rid, p);
+  return p;
+}
+let flushTimer = 0;
+function flushOutbox() {
+  const a = outboxLoad();
+  a.forEach((item) => { if (!inflight.has(item.rid)) sendItem(item).then(() => updatePendingNote(), () => updatePendingNote()); });
+  clearTimeout(flushTimer);
+  if (a.length) flushTimer = setTimeout(flushOutbox, 30000);
+}
+function updatePendingNote() {
+  const el = $('#pending-note'); if (!el) return;
+  const n = outboxLoad().length; const f = failedLoad();
+  let h = '';
+  if (n) h += '<div>送信待ちの点検が ' + n + ' 件あります（電波が戻ると自動で送ります）</div>';
+  if (f.length) {
+    h += '<div style="color:var(--ng)"><b>送れなかった点検が ' + f.length + ' 件あります。</b>重機が使用停止になった等の理由で、受け付けられませんでした。事務所に連絡してください：'
+      + f.map((x) => esc((x.rec.label || '') + ' ' + mdw(x.rec.date) + ' ' + x.rec.t + ' ' + (x.rec.by || ''))).join('、')
+      + ' <button type="button" class="btn sm" data-act="failed-clear">この表示を消す</button></div>';
+  }
+  el.innerHTML = h; el.classList.toggle('hidden', !h);
+}
+// 電波が戻ったら残りを送る。Firebase の部品の読み込みに失敗していた時は、ブラウザがその失敗を覚えていて
+// 読み直せないので、入力中でなければページを開き直す（送信待ちは端末に残っている）
+window.addEventListener('online', () => {
+  if (B.importFailed && !workerDirty() && !$('#modal')) { location.reload(); return; }
+  flushOutbox();
+});
+
+/* =====================================================================
+   作業員の画面
+   ===================================================================== */
+const params = new URLSearchParams(location.search);
+const P_K = (params.get('k') || '').trim();
+const P_M = (params.get('m') || '').trim();
+const KEY_RE = /^[A-Za-z0-9]{6,40}$/;
+const MID_RE = /^[A-Za-z0-9_-]{1,24}$/;
+const app = $('#app');
+
+function demoBar() { return B.isDemo ? '<div class="demo-bar">お試しモード（データはこの端末のブラウザだけに保存されます）</div>' : ''; }
+function renderLoading(msg) { app.innerHTML = demoBar() + '<div class="loading"><div class="spinner"></div>' + esc(msg || '読み込み中…') + '</div>'; }
+function renderError(title, body, extra) {
+  app.innerHTML = demoBar() + '<div class="page-msg"><h1>' + esc(title) + '</h1><p>' + esc(body) + '</p>' + (extra || '') + '</div>';
+}
+function lastKey(tk, mid) { return 'last_' + tk + '_' + mid; }
+function newerLast(a, b) { if (!a) return b; if (!b) return a; return (b.date + ' ' + b.t) > (a.date + ' ' + a.t) ? b : a; }
+
+async function loadCompanyForWorker() {
+  let co = null, cached = false;
+  try {
+    await withTimeout(B.init(false), NET_TIMEOUT_MS);
+    co = await withTimeout(B.getCompany(P_K), NET_TIMEOUT_MS);
+    if (co) lsSet('co_' + P_K, slimCo(co));
+  } catch (e) {
+    co = lsGet('co_' + P_K, null); cached = !!co;
+    if (!co) throw e;
+  }
+  return { co, cached };
+}
+
+async function workerMain() {
+  document.body.className = 'worker';
+  renderLoading();
+  setTimeout(flushOutbox, 500);
+  if (!MID_RE.test(P_M)) return renderError('QRコードが読み取れませんでした', 'もう一度、QRコードを読み取ってください。');
+  let got;
+  try { got = await loadCompanyForWorker(); }
+  catch (e) { return renderError('読み込めませんでした', errText(e) + '。電波の良いところで、もう一度QRコードを読み取ってください。'); }
+  const { co, cached } = got;
+  if (!co) return renderError('このQRコードは使えません', '登録が見つかりませんでした。事務所に連絡してください。');
+  const m = findMachine(co, P_M);
+  if (!m || m.off) {
+    return renderError('この重機は登録されていません', '使わなくなった重機か、QRコードが古い可能性があります。事務所に連絡してください。',
+      '<p><a class="btn" href="' + esc(entranceUrl(P_K)) + '">重機の一覧から選ぶ</a></p>');
+  }
+  let last = lsGet(lastKey(P_K, m.id), null);
+  renderWorkerForm(co, m, last, cached);
+  if (!cached) {
+    B.getLast(P_K, m.id).then((l) => {
+      if (!l) return;
+      const nl = newerLast(last, { date: l.date, t: l.t, ng: !!l.ng });
+      if (nl !== last) { last = nl; lsSet(lastKey(P_K, m.id), nl); const b = $('#w-banner'); if (b) b.outerHTML = bannerHtml(nl); }
+    }).catch(() => {});
+  }
+}
+
+function bannerHtml(last) {
+  const today = ymd();
+  if (last && last.date === today) {
+    return last.ng
+      ? '<div id="w-banner" class="w-banner ng">今日 ' + esc(last.t) + ' の点検で「×（悪い）」がありました。直したか、職長・事務所に確認してから使ってください。</div>'
+      : '<div id="w-banner" class="w-banner ok">今日 ' + esc(last.t) + ' に点検済みです（異常なし）。もう一度点検するときは、下から入力してください。</div>';
+  }
+  if (last && last.ng) {
+    return '<div id="w-banner" class="w-banner ng">前回（' + esc(mdw(last.date)) + '）の点検で「×（悪い）」がありました。直っているか、よく確認してください。</div>';
+  }
+  return '<div id="w-banner" class="w-banner none">今日の点検はまだです。使う前に点検してください。</div>';
+}
+
+const W = { m: null, keys: [], res: {}, sending: false, done: '', tk: '', init: { by: '', site: '' } };
+// 点検票に入力しかけている（開き直すと消える）か
+function workerDirty() {
+  if (!W.m || W.done || !$('#w-by')) return false;
+  return !!(Object.keys(W.res).length || $('#w-note').value.trim() || $('#w-hour').value.trim()
+    || $('#w-by').value !== W.init.by || $('#w-site').value !== W.init.site);
+}
+// アワーメーターの入力を数に直す。全角・「,」の小数点（ベトナム語などの端末）も受ける。数でなければ NaN
+function parseHour(str) {
+  let s = String(str || '').replace(/[０-９．，]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/\s/g, '');
+  if (!s.includes('.') && /^\d+,\d{1,2}$/.test(s)) s = s.replace(',', '.'); else s = s.replace(/,/g, '');
+  if (!/^\d+(\.\d+)?$/.test(s)) return NaN;
+  return Math.round(Number(s) * 10) / 10;
+}
+
+function renderWorkerForm(co, m, last, cached) {
+  W.m = m; W.keys = formKeys(m.form); W.res = {}; W.sending = false; W.done = '';
+  const form = formOf(m.form);
+  const by = lsGet('by', '');
+  const sites = lsGet('sites', []);
+  W.init = { by, site: sites[0] || '' };
+  let h = demoBar();
+  h += '<div class="w-wrap">';
+  h += '<header class="w-head"><div class="co">' + esc(co.name) + '</div><div class="ttl">始業前点検　' + esc(form.name) + '</div>'
+    + '<div class="ml">' + esc(m.label) + '</div><div class="ms">' + esc(machineSub(m)) + '</div></header>';
+  if (cached) h += '<div class="msg warn" style="margin:12px">電波が弱いため、前に読み込んだ内容で表示しています。送信は電波が戻ってから自動で行います。</div>';
+  h += bannerHtml(last);
+  h += '<div id="pending-note" class="msg warn hidden" style="margin:12px"></div>';
+  h += '<div class="w-card">'
+    + '<div class="w-date">点検日　' + esc(jpDate(ymd())) + '</div>'
+    + '<label class="w-field" id="f-by" style="margin-top:10px"><span>点検する人の名前 <b>（必ず）</b></span><input id="w-by" type="text" maxlength="30" autocomplete="name" value="' + esc(by) + '" placeholder="例：田中"></label>'
+    + '<label class="w-field"><span>現場</span><input id="w-site" type="text" maxlength="60" list="w-sites" value="' + esc(sites[0] || '') + '" placeholder="例：誉田町"><datalist id="w-sites">' + sites.map((s) => '<option value="' + esc(s) + '">').join('') + '</datalist></label>'
+    + '<label class="w-field" id="f-hour"><span>アワーメーター（時間）</span><input id="w-hour" type="text" inputmode="decimal" maxlength="9" placeholder="例：1234.5"></label>'
+    + '</div>';
+  h += '<div class="w-legend">' + MARK_ORDER.map((k) => '<span><b class="mk-' + k + '">' + MARKS[k].s + '</b> ' + esc(MARKS[k].long) + '</span>').join('') + '</div>';
+  form.secs.forEach(([sec, keys]) => {
+    h += '<section class="w-sec"><h2><span>' + esc(sec) + '</span><span class="small muted">' + keys.length + '項目</span></h2>';
+    keys.forEach((k) => {
+      const it = ITEMS[k] || { t: k };
+      h += '<div class="w-item" data-k="' + esc(k) + '"><div class="il">' + esc(it.t) + (it.law ? '<span class="law">法定</span>' : '') + '</div>'
+        + (it.h ? '<div class="ih">' + esc(it.h) + '</div>' : '')
+        + '<div class="marks">' + MARK_ORDER.map((v) => '<button type="button" data-v="' + v + '" aria-label="' + esc(MARKS[v].long) + '"><span class="s">' + MARKS[v].s + '</span><span class="t">' + esc(MARKS[v].t) + '</span></button>').join('') + '</div></div>';
+    });
+    h += '</section>';
+  });
+  h += '<div id="w-ngwarn" class="w-ngwarn hidden">「×（悪い）」があります。この重機は使わないで、すぐに職長・事務所に連絡してください。</div>';
+  h += '<div class="w-card"><label class="w-field" id="f-note"><span id="w-note-lb">気づいたこと・調整したこと</span><textarea id="w-note" maxlength="1000" placeholder="例：作動油が少なかったので補充した"></textarea></label></div>';
+  h += '<div class="w-foot">' + esc(co.name) + '　重機 点検票</div>';
+  h += '</div>';
+  h += '<div class="w-bottom"><div class="in"><div class="prog"><b id="w-cnt">0/' + W.keys.length + '</b>点検済</div><button type="button" class="send" id="w-send">送信する</button></div></div>';
+  app.innerHTML = h;
+  updatePendingNote();
+}
+
+function workerUpdate() {
+  const done = W.keys.filter((k) => W.res[k]).length;
+  $('#w-cnt').textContent = done + '/' + W.keys.length;
+  const hasX = Object.values(W.res).includes('x');
+  const hasA = Object.values(W.res).includes('a');
+  $('#w-ngwarn').classList.toggle('hidden', !hasX);
+  $('#w-note-lb').innerHTML = hasX ? '悪いところ（どこが・どうなっているか） <b style="color:var(--ng)">（必ず）</b>'
+    : hasA ? '調整・補充したこと（何をしたか）' : '気づいたこと・調整したこと';
+}
+
+function onWorkerClick(e) {
+  if (e.target.closest('[data-act="failed-clear"]')) { lsDel(FAILED); updatePendingNote(); return; }
+  const b = e.target.closest('.marks button');
+  if (b && !W.sending) {
+    const item = b.closest('.w-item'); const k = item.dataset.k; const v = b.dataset.v;
+    W.res[k] = v;
+    $$('button', item).forEach((x) => x.classList.toggle('on', x === b));
+    item.classList.remove('miss');
+    item.className = item.className.replace(/\bv-\w\b/g, '').trim() + ' v-' + v;
+    workerUpdate();
+    return;
+  }
+  if (e.target.closest('#w-send')) workerSubmit();
+}
+
+async function workerSubmit() {
+  if (W.sending) return;
+  const m = W.m;
+  const by = $('#w-by').value.trim();
+  const site = $('#w-site').value.trim();
+  const hourStr = $('#w-hour').value.trim();
+  const note = $('#w-note').value.trim();
+  $$('.w-field').forEach((f) => f.classList.remove('need'));
+  const missing = W.keys.filter((k) => !W.res[k]);
+  if (missing.length) {
+    missing.forEach((k) => { const el = $('.w-item[data-k="' + k + '"]'); if (el) el.classList.add('miss'); });
+    const first = $('.w-item[data-k="' + missing[0] + '"]');
+    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    toast('まだ選んでいない項目が ' + missing.length + ' 個あります（赤い枠）');
+    return;
+  }
+  if (!by) { $('#f-by').classList.add('need'); $('#w-by').focus(); $('#f-by').scrollIntoView({ behavior: 'smooth', block: 'center' }); toast('点検する人の名前を入れてください'); return; }
+  let hour = null;
+  if (hourStr) {
+    hour = parseHour(hourStr); // 丸めてから範囲を見る（999999.95 が 1000000 になってルールで断られないように）
+    if (!isFinite(hour) || hour < 0 || hour >= 1000000) { $('#f-hour').classList.add('need'); $('#w-hour').focus(); toast('アワーメーターは数字で入れてください'); return; }
+  }
+  const hasX = Object.values(W.res).includes('x');
+  if (hasX && !note) { $('#f-note').classList.add('need'); $('#w-note').focus(); $('#f-note').scrollIntoView({ behavior: 'smooth', block: 'center' }); toast('「×」の内容（どこが悪いか）を書いてください'); return; }
+
+  lsSet('by', by);
+  if (site) lsSet('sites', [site].concat(lsGet('sites', []).filter((s) => s !== site)).slice(0, 8));
+  const now = new Date(); const date = ymd(now); const t = hm(now); const ym = date.slice(0, 7);
+  const rec = { mid: m.id, label: m.label, date, ym, mm: m.id + '|' + ym, t, form: m.form || 'ex', fv: formOf(m.form).v,
+    res: Object.assign({}, W.res), ng: hasX, hour, site, by, note };
+  const last = { date, t, ng: hasX };
+  W.sending = true;
+  const btn = $('#w-send'); btn.disabled = true; btn.textContent = '送信中…';
+  // ネットを待つ前に、まず端末に書く（記録のIDは Firestore の自動IDと同じ形の20文字の乱数）
+  const rid = randId(20);
+  const item = { tk: P_K, rid, rec, last, prevLast: lsGet(lastKey(P_K, m.id), null), tries: 0, savedAt: Date.now() };
+  const kept = outboxPut(item);
+  lsSet(lastKey(P_K, m.id), last);
+  W.done = rid;
+  const p = sendItem(item);
+  const r = await Promise.race([p.then(() => 'sent', (e) => ({ err: e })), sleep(SEND_WAIT_MS).then(() => 'slow')]);
+  if (r === 'sent') return renderDone(rec, 'sent');
+  if (r !== 'slow' && isCode(r.err, 'rejected')) return renderDone(rec, 'failed');
+  renderDone(rec, 'pending', !kept);
+  // 画面がそのままなら、届いた・断られたで書き換える（「もう一度入力する」で開き直した後は何もしない）
+  p.then(() => { if (W.done === rid) renderDone(rec, 'sent'); },
+    (e) => { if (W.done === rid && isCode(e, 'rejected')) renderDone(rec, 'failed'); else setTimeout(flushOutbox, 15000); });
+}
+
+function renderDone(rec, state, notKept) {
+  const ng = rec.ng; const c = countMarks(rec.res);
+  let h = demoBar() + '<div class="w-wrap"><div class="w-done' + (state === 'pending' ? ' pending' : state === 'failed' ? ' failed' : '') + '">';
+  if (state === 'sent') h += '<div class="mark">✓</div><h1>送信しました</h1>';
+  else if (state === 'failed') h += '<div class="mark">!</div><h1>送れませんでした</h1><p>この重機は受け付けられませんでした（使用停止になった・QRコードが古いなど）。<b>事務所に連絡してください。</b>入力した内容は下のとおりです。</p>';
+  else h += '<div class="mark">…</div><h1>送信待ち</h1><p>電波が弱いため、まだ送れていません。つながったら自動で送ります。' + (notKept ? '<b>この画面は閉じないでください。</b>' : '画面を閉じても、次にQRコードを読み取ったときに送ります。') + '</p>';
+  if (ng) h += '<div class="ngbox">「×（悪い）」があります。<br>この重機は使わないでください。職長・事務所にすぐ連絡してください。</div>';
+  h += '<div class="sum"><div><b style="font-size:22px">' + esc(rec.label) + '</b></div>'
+    + '<div>' + esc(jpDate(rec.date)) + '　' + esc(rec.t) + '</div>'
+    + '<div>点検：' + esc(rec.by) + (rec.site ? '　現場：' + esc(rec.site) : '') + (rec.hour != null ? '　' + esc(rec.hour) + 'h' : '') + '</div>'
+    + '<div>○ ' + c.o + '　△ ' + c.a + '　× ' + c.x + (c.n ? '　－ ' + c.n : '') + '</div>'
+    + (rec.note ? '<div class="muted" style="white-space:pre-wrap">' + esc(rec.note) + '</div>' : '') + '</div>';
+  h += '<button type="button" class="btn" onclick="location.reload()">もう一度入力する</button>';
+  h += '</div></div>';
+  app.innerHTML = h;
+  window.scrollTo(0, 0);
+}
+
+/* ---------- QRが読めない時の入口（?k=… だけ）：重機を選ぶ ---------- */
+async function pickerMain() {
+  document.body.className = 'worker';
+  renderLoading();
+  setTimeout(flushOutbox, 500);
+  let got;
+  try { got = await loadCompanyForWorker(); }
+  catch (e) { return renderError('読み込めませんでした', errText(e) + '。電波の良いところで開き直してください。'); }
+  if (!got.co) return renderError('この入口は使えません', '登録が見つかりませんでした。事務所に連絡してください。');
+  const list = (got.co.machines || []).filter((m) => !m.off);
+  let h = demoBar() + '<div class="w-wrap"><header class="w-head"><div class="co">' + esc(got.co.name) + '</div><div class="ml" style="font-size:24px">点検する重機を選ぶ</div><div class="ms">ふだんは重機に貼ったQRコードを読み取ってください</div></header>';
+  h += '<div id="pending-note" class="msg warn hidden" style="margin:12px"></div>';
+  h += '<div class="pick-list">' + list.map((m) => '<a href="' + esc(machineUrl(P_K, m.id)) + '"><b>' + esc(m.label) + '</b><span>' + esc(machineSub(m)) + '</span></a>').join('') + '</div>';
+  h += '<div class="w-foot"><a href="' + esc(appUrl()) + '">事務所の方（管理画面）</a></div></div>';
+  app.innerHTML = h;
+  updatePendingNote();
+}
+
+/* =====================================================================
+   事務所の画面（Google でログイン）
+   ===================================================================== */
+const UA = navigator.userAgent || '';
+const IN_APP = /\bLine\//.test(UA) ? 'LINE' : /FBAN|FBAV|FB_IAB|Instagram/.test(UA) ? 'SNS' : /; wv\)/.test(UA) ? 'アプリ' : '';
+// seq：タブを読み込むたびに1つ増やす。古い読み込みの結果で新しい表示を上書きしないため
+// followToday：「今日の点検」が今日を見ている（日付を自分で変えていない）なら、日付が変わった時に追いかける
+// drafts：不良・対応の書きかけ（ほかのカードを保存して描き直しても消えないように）
+const AD = { user: null, tk: '', co: null, tab: 'today', date: ymd(), month: ymd().slice(0, 7), mid: '', ngAll: false, cut: true, recCache: {}, seq: 0, followToday: true, drafts: {} };
+
+async function adminMain() {
+  document.body.className = 'admin';
+  renderLoading();
+  setTimeout(flushOutbox, 1000);
+  try { await withTimeout(B.init(true), NET_TIMEOUT_MS); }
+  catch (e) { return renderError('読み込めませんでした', errText(e) + '。ネットにつながっているか確かめて、開き直してください。'); }
+  let started = false;
+  B.onAuth(async (user) => {
+    if (started && AD.user && user && AD.user.email === user.email) return;
+    if (started) { location.reload(); return; } // ログイン状態が変わったら開き直す
+    started = !!user;
+    AD.user = user;
+    if (!user) return renderLogin();
+    renderLoading('確認しています…');
+    try {
+      const tks = await withTimeout(B.findMyCompanies(user.email), NET_TIMEOUT_MS);
+      if (tks.length) {
+        const pref = lsGet('admin_tk', '');
+        AD.tk = tks.includes(pref) ? pref : tks[0];
+        lsSet('admin_tk', AD.tk);
+        AD.co = await withTimeout(B.getCompany(AD.tk), NET_TIMEOUT_MS);
+        if (!AD.co) return renderError('会社の登録が見つかりません', 'もう一度開き直してください。');
+        AD.mid = (AD.co.machines[0] || {}).id || '';
+        return renderAdmin();
+      }
+      if (await withTimeout(B.canSetup(), NET_TIMEOUT_MS)) return renderSetup();
+      renderNotRegistered();
+    } catch (e) {
+      renderError('確認できませんでした', errText(e), '<p><button class="btn" onclick="location.reload()">開き直す</button></p>');
+    }
+  });
+}
+
+function renderLogin() {
+  let h = demoBar() + '<div class="login-box"><h1>重機 点検票（管理）</h1>'
+    + '<p class="muted">事務所の方は Google アカウントでログインしてください。<br>作業員の方はログイン不要です。重機に貼ったQRコードをスマホのカメラで読み取ってください。</p>';
+  if (IN_APP) h += '<div class="msg warn">この画面（' + esc(IN_APP) + ' の中のブラウザ）では Google のログインができません。Safari か Chrome で開き直してください。</div>';
+  h += '<button class="btn primary" data-act="login">Google でログイン</button><div id="login-err" class="small" style="color:var(--ng);margin-top:8px"></div></div>';
+  app.innerHTML = h;
+}
+async function doLogin() {
+  const err = $('#login-err');
+  if (IN_APP === 'LINE' && !params.has('openExternalBrowser')) { location.href = appUrl() + '?openExternalBrowser=1'; return; }
+  try { await B.login(); }
+  catch (e) {
+    if (e && (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request')) return;
+    if (err) err.textContent = e && e.code === 'auth/popup-blocked' ? 'ポップアップが止められました。ブラウザの設定でこのページのポップアップを許可してください。' : 'ログインできませんでした：' + errText(e);
+  }
+}
+function renderNotRegistered() {
+  app.innerHTML = demoBar() + '<div class="login-box"><h1>登録されていません</h1><p>' + esc(AD.user.email) + ' は、重機 点検票の「編集できる人」に入っていません。</p><p class="muted">管理している人に、設定タブの「編集できる人」へ追加してもらってください。</p><button class="btn" data-act="logout">ログアウト</button></div>';
+}
+function renderSetup() {
+  app.innerHTML = demoBar() + '<div class="login-box"><h1>はじめての登録</h1>'
+    + '<p class="muted">会社を登録すると、重機 ' + SEED_MACHINES.length + ' 台（現場配置ボードの重機）が入った状態で始まります。登録は1回だけです。</p>'
+    + '<label>会社名<input id="su-name" type="text" maxlength="40" value="' + esc(SETUP_DEFAULT_NAME) + '"></label>'
+    + '<label>編集できる人のメールアドレス（1行に1人）<textarea id="su-eds">' + esc(AD.user.email) + '</textarea></label>'
+    + '<button class="btn primary" data-act="setup">登録して始める</button><div id="su-err" class="small" style="color:var(--ng);margin-top:8px"></div>'
+    + '<button class="btn" data-act="logout">ログアウト</button></div>';
+}
+function parseEmails(text) {
+  const out = []; String(text || '').split(/[\s,;、]+/).forEach((s) => { const m = s.match(/[^<>\s"]+@[^<>\s"]+\.[^<>\s"]+/); if (m) { const e = normEmail(m[0]); if (!out.includes(e)) out.push(e); } });
+  return out;
+}
+async function doSetup(btn) {
+  const err = $('#su-err'); const name = $('#su-name').value.trim();
+  let eds = parseEmails($('#su-eds').value);
+  if (!eds.includes(AD.user.email)) eds.unshift(AD.user.email);
+  if (!name) { err.textContent = '会社名を入れてください'; return; }
+  if (eds.length > 50) { err.textContent = '編集できる人は50人までです'; return; }
+  btn.disabled = true; err.textContent = '';
+  const form = $('.login-box');
+  const tk = form.dataset.tk || (form.dataset.tk = B.newId());
+  try {
+    await withTimeout(B.createCompany(tk, name, eds, clone(SEED_MACHINES)), NET_TIMEOUT_MS);
+    location.reload();
+  } catch (e) {
+    try { if (await B.companyExists(tk)) { location.reload(); return; } } catch (e2) { /* 確かめられない */ }
+    btn.disabled = false; err.textContent = '登録できませんでした：' + errText(e);
+  }
+}
+
+const TABS = [['today', '今日の点検'], ['sheet', '月の点検表'], ['ng', '不良・対応'], ['machines', '重機・QR'], ['settings', '設定']];
+function renderAdmin() {
+  let h = demoBar() + '<header class="a-head"><div class="t">重機 点検票<span>管理</span></div><div class="co">' + esc(AD.co.name) + '</div>'
+    + '<div class="u"><span>' + esc(AD.user.email) + '</span>' + (B.isDemo ? '' : '<button class="btn" data-act="logout">ログアウト</button>') + '</div></header>';
+  h += '<nav class="tabs">' + TABS.map(([k, t]) => '<button data-tab="' + k + '"' + (AD.tab === k ? ' class="on"' : '') + '>' + esc(t) + (k === 'ng' ? '<span class="cnt hidden" id="ng-cnt"></span>' : '') + '</button>').join('') + '</nav>';
+  h += '<div id="pending-note" class="msg warn hidden" style="margin:10px 16px 0"></div><main id="a-main"></main>';
+  app.innerHTML = h;
+  updatePendingNote();
+  showTab(AD.tab);
+  refreshNgCount();
+}
+function showTab(tab) {
+  AD.tab = tab;
+  $$('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+  const fn = { today: tabToday, sheet: tabSheet, ng: tabNg, machines: tabMachines, settings: tabSettings }[tab];
+  const seq = ++AD.seq;
+  fn(seq).catch((e) => { if (seq !== AD.seq) return; const mm = $('#a-main'); if (mm) mm.innerHTML = '<div class="msg err">読み込めませんでした：' + esc(errText(e)) + ' <button class="btn sm" data-act="reload">もう一度</button></div>'; });
+}
+function machinesSorted(includeOff) { return (AD.co.machines || []).filter((m) => includeOff || !m.off); }
+function mBy(mid) { return findMachine(AD.co, mid); }
+function markCell(v) { return v ? '<span class="mk-' + v + '">' + (MARKS[v] ? MARKS[v].s : esc(v)) + '</span>' : ''; }
+function tagOf(rec) {
+  const c = countMarks(rec.res);
+  if (rec.ng) return '<span class="tag ng">× ' + c.x + '</span>' + (c.a ? '<span class="tag adj">△ ' + c.a + '</span>' : '');
+  if (c.a) return '<span class="tag adj">△ ' + c.a + '</span>';
+  return '<span class="tag ok">異常なし</span>';
+}
+
+/* ----- 今日の点検 ----- */
+async function tabToday(seq) {
+  const main = $('#a-main');
+  main.innerHTML = '<div class="toolbar"><button class="btn" data-act="day" data-n="-1">◀ 前の日</button><input type="date" id="t-date" value="' + esc(AD.date) + '"><button class="btn" data-act="day" data-n="1">次の日 ▶</button>'
+    + '<button class="btn" data-act="day" data-n="0">今日</button><span class="sp"></span><button class="btn" data-act="reload">↻ 最新にする</button></div><div id="t-body"><div class="loading"><div class="spinner"></div></div></div>';
+  const date = AD.date;
+  const recs = sortRecs(await B.listRecords(AD.tk, 'date', date));
+  if (seq !== AD.seq) return;
+  AD.recCache = {}; recs.forEach((r) => { AD.recCache[r.id] = r; });
+  const byM = {}; recs.forEach((r) => { (byM[r.mid] = byM[r.mid] || []).push(r); });
+  const order = (AD.co.machines || []).map((m) => m.id);
+  // その日に1回でも「×」があれば不良として扱う（あとの点検で全部○にしても、先の×を見落とさないように）
+  const anyNg = (id) => byM[id].some((r) => r.ng);
+  const mids = Object.keys(byM).sort((a, b) => {
+    if (anyNg(a) !== anyNg(b)) return anyNg(a) ? -1 : 1;
+    return order.indexOf(a) - order.indexOf(b);
+  });
+  const ngN = mids.filter(anyNg).length;
+  let h = '<div class="stat"><div class="ok"><b>' + mids.length + '</b>台 点検済み</div><div class="ng"><b>' + ngN + '</b>台 不良あり</div><div><b>' + recs.length + '</b>件の記録</div></div>';
+  if (!mids.length) h += '<div class="empty">' + esc(jpDate(date)) + ' の点検はまだありません。</div>';
+  else {
+    h += '<div class="tlist">';
+    mids.forEach((mid) => {
+      const list = byM[mid]; const r = list[list.length - 1]; const m = mBy(mid) || { label: r.label, type: '', mfr: '', model: '' };
+      const c = countMarks(r.res);
+      const earlierNg = !r.ng ? list.filter((x) => x.ng) : [];
+      h += '<div class="trow ' + (anyNg(mid) ? 'ng' : c.a ? 'adj' : '') + '" data-rec="' + esc(r.id) + '"><div class="l">' + esc(m.label || r.label) + tagOf(r) + (list.length > 1 ? '<span class="tag done">' + list.length + '回</span>' : '') + '</div>'
+        + (earlierNg.length ? '<div class="m" style="color:var(--ng)">' + earlierNg.map((x) => esc(x.t) + ' ' + esc(x.by)).join('、') + ' の点検で「×」あり（「不良・対応」タブ）</div>' : '')
+        + '<div class="s">' + esc(machineSub(m)) + '</div>'
+        + '<div class="m">' + esc(r.t) + '　' + esc(r.by) + (r.site ? '　／ ' + esc(r.site) : '') + (r.hour != null ? '　／ ' + esc(r.hour) + 'h' : '') + (lateText(r) ? '　<span class="tag adj">後から送信 ' + esc(lateText(r)) + '</span>' : '') + '</div>'
+        + (r.note ? '<div class="s" style="white-space:pre-wrap">' + esc(r.note) + '</div>' : '') + '</div>';
+    });
+    h += '</div>';
+  }
+  const none = machinesSorted(false).filter((m) => !byM[m.id]);
+  if (none.length) h += '<details class="none-list"><summary>点検の記録がない重機 ' + none.length + ' 台（その日に使っていない重機も含みます）</summary><div class="chips">' + none.map((m) => '<span>' + esc(m.label) + '</span>').join('') + '</div></details>';
+  $('#t-body').innerHTML = h;
+}
+
+/* ----- 記録の中身（モーダル） ----- */
+function recordDetailHtml(r) {
+  const m = mBy(r.mid) || { label: r.label, type: '', mfr: '', model: '', serial: '' };
+  const form = formOf(r.form);
+  let h = '<h2>' + esc(m.label || r.label) + '　' + esc(mdw(r.date)) + ' ' + esc(r.t) + '</h2>';
+  h += '<dl class="kv"><dt>重機</dt><dd>' + esc(machineSub(m)) + '</dd><dt>点検した人</dt><dd>' + esc(r.by) + '</dd><dt>現場</dt><dd>' + esc(r.site || '－') + '</dd>'
+    + '<dt>アワーメーター</dt><dd>' + (r.hour != null ? esc(r.hour) + ' h' : '－') + '</dd><dt>点検票</dt><dd>' + esc(form.name) + '</dd>'
+    + (lateText(r) ? '<dt>届いた日時</dt><dd style="color:var(--adj)">' + esc(lateText(r)) + '（後から送信）</dd>' : '') + '</dl>';
+  h += '<table class="dtable">';
+  const shown = new Set();
+  form.secs.forEach(([sec, keys]) => {
+    h += '<tr class="sec"><td colspan="2">' + esc(sec) + '</td></tr>';
+    keys.forEach((k) => { shown.add(k); h += '<tr><td>' + esc(itemText(k)) + '</td><td class="mk">' + markCell(r.res[k]) + ' <span class="small muted">' + esc(r.res[k] ? MARKS[r.res[k]].t : '') + '</span></td></tr>'; });
+  });
+  const extra = Object.keys(r.res || {}).filter((k) => !shown.has(k));
+  if (extra.length) { h += '<tr class="sec"><td colspan="2">その他</td></tr>'; extra.forEach((k) => { h += '<tr><td>' + esc(itemText(k)) + '</td><td class="mk">' + markCell(r.res[k]) + '</td></tr>'; }); }
+  h += '</table>';
+  if (r.note) h += '<div class="msg ' + (r.ng ? 'err' : 'info') + '" style="white-space:pre-wrap"><b>' + (r.ng ? '悪いところ' : '気づいたこと') + '：</b>' + esc(r.note) + '</div>';
+  if (r.fix || r.fixDone) h += '<div class="msg info" style="white-space:pre-wrap"><b>対応' + (r.fixDone ? '（済み）' : '') + '：</b>' + esc(r.fix || '') + (r.fixBy ? '<br><span class="small muted">' + esc(r.fixBy) + '</span>' : '') + '</div>';
+  h += '<div class="foot"><button class="btn danger" data-act="del-rec" data-rid="' + esc(r.id) + '">この記録を削除</button><button class="btn primary" data-act="close">閉じる</button></div>';
+  return h;
+}
+function openModal(html) {
+  closeModal();
+  const bg = document.createElement('div'); bg.className = 'modal-bg'; bg.id = 'modal';
+  bg.innerHTML = '<div class="modal"><button class="x" data-act="close" aria-label="閉じる">×</button>' + html + '</div>';
+  document.body.appendChild(bg);
+  bg.addEventListener('click', (e) => { if (e.target === bg) closeModal(); });
+  bg.addEventListener('click', onAdminClick);
+}
+function closeModal() { const m = $('#modal'); if (m) m.remove(); }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+/* ----- 月の点検表 ----- */
+async function tabSheet(seq) {
+  const main = $('#a-main');
+  if (!mBy(AD.mid)) AD.mid = (AD.co.machines[0] || {}).id || '';
+  const opts = (AD.co.machines || []).map((m) => '<option value="' + esc(m.id) + '"' + (m.id === AD.mid ? ' selected' : '') + '>' + esc(m.label) + '　' + esc([m.mfr, m.model].filter(Boolean).join(' ')) + (m.off ? '（使用停止）' : '') + '</option>').join('');
+  main.innerHTML = '<div class="toolbar"><select id="s-mid">' + opts + '</select><button class="btn" data-act="month" data-n="-1">◀</button><input type="month" id="s-month" value="' + esc(AD.month) + '"><button class="btn" data-act="month" data-n="1">▶</button>'
+    + '<span class="sp"></span><button class="btn primary" data-act="print-sheet">この表を印刷</button><button class="btn" data-act="print-month">この月の全部を印刷</button></div>'
+    + '<p class="small muted" style="margin:-4px 0 10px">A4 横で印刷されます。1日に2回以上点検した日は、表には最後の点検を載せ、下の備考に回数を書きます。</p>'
+    + '<div id="s-body"><div class="loading"><div class="spinner"></div></div></div>';
+  const mid = AD.mid, ym = AD.month;
+  if (!mid) { $('#s-body').innerHTML = '<div class="empty">重機が登録されていません。</div>'; return; }
+  const recs = await B.listRecords(AD.tk, 'mm', mid + '|' + ym);
+  if (seq !== AD.seq) return;
+  $('#s-body').innerHTML = '<div class="sheet-wrap">' + sheetHtml(mBy(mid), ym, recs) + '</div>';
+}
+
+function sheetHtml(m, ym, recsIn) {
+  const recs = sortRecs(recsIn.slice());
+  const [y, mo] = ym.split('-').map(Number);
+  const days = new Date(y, mo, 0).getDate();
+  const byDay = {}; const cnt = {};
+  recs.forEach((r) => { const d = Number(r.date.slice(8, 10)); byDay[d] = r; cnt[d] = (cnt[d] || 0) + 1; });
+  // 項目：今の点検票の項目＋（点検票を変える前の記録にだけある項目）
+  const secs = formOf(m.form).secs.map(([s, ks]) => [s, ks.slice()]);
+  const known = new Set(secs.flatMap((s) => s[1]));
+  const extra = []; recs.forEach((r) => Object.keys(r.res || {}).forEach((k) => { if (!known.has(k) && !extra.includes(k)) extra.push(k); }));
+  if (extra.length) secs.push(['その他', extra]);
+  const sites = []; recs.forEach((r) => { if (r.site && !sites.includes(r.site)) sites.push(r.site); });
+  const dayCls = (d) => { const w = new Date(y, mo - 1, d).getDay(); return w === 0 ? 'sun' : w === 6 ? 'sat' : ''; };
+  let h = '<div class="sheet">';
+  h += '<div class="sh-top"><div class="sh-title">車両系建設機械　作業開始前点検表</div><div class="sh-ym">' + y + '年 ' + mo + '月</div></div>';
+  h += '<table class="sh-info"><colgroup><col style="width:16mm"><col style="width:34mm"><col style="width:16mm"><col style="width:52mm"><col style="width:25mm"><col><col style="width:18mm"><col style="width:40mm"></colgroup>'
+    + '<tr><th>機械</th><td>' + esc(m.label) + '</td><th>種類</th><td>' + esc(m.type || '') + '</td><th>メーカー・型式</th><td>' + esc([m.mfr, m.model].filter(Boolean).join(' ')) + '</td><th>車体番号</th><td>' + esc(m.serial || '') + '</td></tr>'
+    + '<tr><th>現場</th><td colspan="5">' + esc(sites.join('、')) + '</td><th>会社</th><td>' + esc(AD.co.name) + '</td></tr></table>';
+  h += '<table class="sh-grid"><colgroup><col style="width:6mm"><col style="width:58mm">' + '<col>'.repeat(31) + '</colgroup>';
+  h += '<thead><tr><th colspan="2">点検項目　＼　日</th>';
+  for (let d = 1; d <= 31; d++) h += d <= days ? '<th class="' + dayCls(d) + '">' + d + '</th>' : '<th class="nd"></th>';
+  h += '</tr><tr><th colspan="2" style="font-weight:400">曜日</th>';
+  for (let d = 1; d <= 31; d++) h += d <= days ? '<th class="' + dayCls(d) + '" style="font-weight:400">' + DOW[new Date(y, mo - 1, d).getDay()] + '</th>' : '<th class="nd"></th>';
+  h += '</tr></thead><tbody>';
+  secs.forEach(([sec, keys]) => {
+    keys.forEach((k, i) => {
+      h += '<tr>' + (i === 0 ? '<th class="secv" rowspan="' + keys.length + '">' + esc(SEC_SHORT[sec] || sec) + '</th>' : '') + '<td class="it">' + esc(itemShort(k)) + (ITEMS[k] && ITEMS[k].law ? ' ★' : '') + '</td>';
+      for (let d = 1; d <= 31; d++) {
+        if (d > days) { h += '<td class="nd"></td>'; continue; }
+        const r = byDay[d]; const v = r && r.res ? r.res[k] : '';
+        h += '<td class="m ' + (v || '') + '">' + (v && MARKS[v] ? MARKS[v].s : '') + '</td>';
+      }
+      h += '</tr>';
+    });
+  });
+  const footRow = (label, fn, cls, num) => {
+    let s = '<tr class="fr ' + cls + '"><td class="it" colspan="2" style="text-align:center;font-weight:600">' + label + '</td>';
+    for (let d = 1; d <= 31; d++) {
+      if (d > days) { s += '<td class="nd"></td>'; continue; }
+      const r = byDay[d]; const val = r ? String(fn(r)) : '';
+      s += '<td>' + (val !== '' ? '<div class="v' + (num ? ' num' : '') + (!num && val.length > 6 ? ' long' : '') + '">' + esc(val) + '</div>' : '') + '</td>';
+    }
+    return s + '</tr>';
+  };
+  // 縦の欄に入る名前：中黒・空白を除いて8文字まで（例：グエン・ヴァン・ナム → グエンヴァンナム）
+  const shortName = (s) => { const t = Array.from(String(s || '').replace(/[・･\s　]/g, '')); return t.length > 8 ? t.slice(0, 7).join('') + '…' : t.join(''); };
+  h += footRow('点検者', (r) => shortName(r.by), 'vt nm', false);
+  h += footRow('アワーメーター（h）', (r) => (r.hour != null ? r.hour : ''), 'vt hr', true);
+  h += footRow('確認（職長）', () => '', 'stamp', false);
+  h += '</tbody></table>';
+  const notes = [];
+  recs.forEach((r) => {
+    const d = Number(r.date.slice(8, 10));
+    const parts = [];
+    if (r.note) parts.push(r.note.replace(/\s*\n\s*/g, ' '));
+    if (r.fix) parts.push('→ 対応' + (r.fixDone ? '済' : '') + '：' + r.fix.replace(/\s*\n\s*/g, ' '));
+    if (parts.length) notes.push(mo + '/' + d + ' ' + r.t + ' ' + r.by + '：' + parts.join('　'));
+  });
+  Object.keys(cnt).forEach((d) => { if (cnt[d] > 1) notes.push(mo + '/' + d + ' は ' + cnt[d] + ' 回点検（表は最後の点検）'); });
+  const cols = notes.length > 8 ? ' cols3' : notes.length > 3 ? ' cols2' : '';
+  h += '<div class="sh-notes"><div class="nh"><b>備考</b><span>○ 良い　△ 調整・補充した　× 悪い（使用禁止）　－ 装置なし　★ 法定の作業開始前点検（安衛則170条・クレーン則78条）　／　重機 点検票（スマホ入力）より作成</span></div>'
+    + '<div class="nb' + cols + '">' + notes.map((n) => '<div>' + esc(n) + '</div>').join('') + '</div></div>';
+  h += '</div>';
+  return h;
+}
+
+function printHtml(html, pageCss) {
+  $('#page-style').textContent = '@media print { @page { ' + pageCss + ' } }';
+  $('#print-area').innerHTML = html;
+  document.body.classList.add('printing');
+  setTimeout(() => { window.print(); }, 50);
+}
+window.addEventListener('afterprint', () => { document.body.classList.remove('printing'); $('#print-area').innerHTML = ''; });
+
+async function printMonthAll() {
+  const ym = AD.month;
+  toast('読み込み中…');
+  const recs = await B.listRecords(AD.tk, 'ym', ym);
+  const byM = {}; recs.forEach((r) => { (byM[r.mid] = byM[r.mid] || []).push(r); });
+  const ms = (AD.co.machines || []).filter((m) => byM[m.id]);
+  if (!ms.length) { toast(ym.replace('-', '年') + '月の点検はありません'); return; }
+  printHtml(ms.map((m) => sheetHtml(m, ym, byM[m.id])).join(''), 'size: A4 landscape; margin: 8mm;');
+}
+
+/* ----- 不良・対応 ----- */
+async function refreshNgCount() {
+  try {
+    const recs = await B.listRecords(AD.tk, 'ng', true);
+    const n = recs.filter((r) => !r.fixDone).length;
+    const el = $('#ng-cnt'); if (el) { el.textContent = n; el.classList.toggle('hidden', !n); }
+  } catch (e) { /* 数は出せなくてもよい */ }
+}
+async function tabNg(seq) {
+  const main = $('#a-main');
+  main.innerHTML = '<div class="toolbar"><label><input type="checkbox" id="ng-all"' + (AD.ngAll ? ' checked' : '') + '> 対応済みも表示</label><span class="sp"></span><button class="btn" data-act="reload">↻ 最新にする</button></div><div id="n-body"><div class="loading"><div class="spinner"></div></div></div>';
+  const recs = sortRecs(await B.listRecords(AD.tk, 'ng', true)).reverse();
+  if (seq !== AD.seq) return;
+  AD.recCache = {}; recs.forEach((r) => { AD.recCache[r.id] = r; });
+  const open = recs.filter((r) => !r.fixDone).length;
+  const el = $('#ng-cnt'); if (el) { el.textContent = open; el.classList.toggle('hidden', !open); }
+  const list = AD.ngAll ? recs : recs.filter((r) => !r.fixDone);
+  let h = '<div class="stat"><div class="ng"><b>' + open + '</b>件 未対応</div><div><b>' + (recs.length - open) + '</b>件 対応済み</div></div>';
+  if (!list.length) h += '<div class="empty">' + (open ? '' : '未対応の不良はありません。') + '</div>';
+  list.forEach((r) => {
+    const m = mBy(r.mid) || { label: r.label };
+    const xs = Object.keys(r.res || {}).filter((k) => r.res[k] === 'x');
+    h += '<div class="ngcard' + (r.fixDone ? ' done' : '') + '" data-rid="' + esc(r.id) + '"><div class="h"><b>' + esc(m.label || r.label) + '</b><span>' + esc(jpDate(r.date)) + ' ' + esc(r.t) + '</span><span class="muted">' + esc(r.by) + (r.site ? '／' + esc(r.site) : '') + '</span>'
+      + (r.fixDone ? '<span class="tag done">対応済み</span>' : '<span class="tag ng">未対応</span>') + '<button class="btn sm" data-rec="' + esc(r.id) + '">点検の中身</button></div>'
+      + '<ul>' + xs.map((k) => '<li><span class="mk-x">×</span> ' + esc(itemText(k)) + '</li>').join('') + '</ul>'
+      + (r.note ? '<div class="note">' + esc(r.note) + '</div>' : '')
+      + '<textarea data-rid="' + esc(r.id) + '" placeholder="対応した内容（例：11/12 コマツに修理依頼、ホース交換済み）" maxlength="1000">' + esc(AD.drafts[r.id] != null ? AD.drafts[r.id] : (r.fix || '')) + '</textarea>'
+      + '<div class="fixrow">' + (r.fixBy ? '<span class="small muted">最後に書いた人：' + esc(r.fixBy) + '</span>' : '') + '<span class="sp" style="flex:1"></span>'
+      + '<button class="btn sm" data-act="fix-save" data-rid="' + esc(r.id) + '">対応を保存</button>'
+      + (r.fixDone ? '<button class="btn sm" data-act="fix-done" data-rid="' + esc(r.id) + '" data-v="0">未対応に戻す</button>' : '<button class="btn sm primary" data-act="fix-done" data-rid="' + esc(r.id) + '" data-v="1">対応済みにする</button>')
+      + '</div></div>';
+  });
+  $('#n-body').innerHTML = h;
+}
+async function saveFix(rid, done) {
+  const card = $('.ngcard[data-rid="' + rid + '"]'); const r = AD.recCache[rid];
+  if (!card || !r) return;
+  const fix = $('textarea', card).value.trim().slice(0, 1000);
+  const fixDone = done == null ? !!r.fixDone : done;
+  const fixBy = ((AD.user.name || '') + ' ' + AD.user.email).trim().slice(0, 60);
+  $$('button', card).forEach((b) => { b.disabled = true; });
+  try {
+    await withTimeout(B.updateFix(AD.tk, rid, { fix, fixDone, fixBy }), NET_TIMEOUT_MS);
+    delete AD.drafts[rid];
+    toast(done == null ? '保存しました' : done ? '対応済みにしました' : '未対応に戻しました');
+    showTab('ng');
+  } catch (e) { toast('保存できませんでした：' + errText(e), 5000); $$('button', card).forEach((b) => { b.disabled = false; }); }
+}
+
+/* ----- 重機・QR ----- */
+async function tabMachines() {
+  const main = $('#a-main');
+  const ms = AD.co.machines || [];
+  let h = '<div class="toolbar"><button class="btn" data-act="m-add">＋ 重機を追加</button><span class="sp"></span>'
+    + '<label class="small"><input type="checkbox" id="q-cut"' + (AD.cut ? ' checked' : '') + '> 切り取り線</label>'
+    + '<button class="btn" data-act="qr-sel">選んだ重機のQRを印刷</button><button class="btn primary" data-act="qr-all">使用中の全部のQRを印刷</button></div>';
+  h += '<p class="small muted" style="margin:-4px 0 10px">QRラベルは A4 に 10 枚（名刺サイズ 91×55mm・2列×5段）。名刺用カード・ラベル用紙（エーワン 名刺10面など）にそのまま印刷できます。屋外に貼るので、ラミネートか屋外用のラベル用紙をおすすめします。</p>';
+  h += '<div class="wrap-x"><table class="mtable"><thead><tr><th><input type="checkbox" id="m-chkall" title="全部選ぶ"></th><th>表示名</th><th>種類</th><th>メーカー・型式</th><th>車体番号</th><th>点検票</th><th>状態</th><th></th></tr></thead><tbody>';
+  ms.forEach((m) => {
+    h += '<tr' + (m.off ? ' class="off"' : '') + '><td><input type="checkbox" class="m-chk" value="' + esc(m.id) + '"></td><td class="lb">' + esc(m.label) + '</td><td>' + esc(m.type || '') + '</td><td>' + esc([m.mfr, m.model].filter(Boolean).join(' ')) + '</td><td>' + esc(m.serial || '') + '</td><td>' + esc(formOf(m.form).name) + '</td><td>' + (m.off ? '使用停止' : '使用中') + '</td>'
+      + '<td style="white-space:nowrap"><button class="btn sm" data-act="m-edit" data-mid="' + esc(m.id) + '">編集</button><a class="btn sm" target="_blank" rel="noopener" href="' + esc(machineUrl(AD.tk, m.id)) + '">点検票を開く</a></td></tr>';
+  });
+  h += '</tbody></table></div>';
+  main.innerHTML = h;
+}
+function machineEditHtml(m, isNew) {
+  const fopts = Object.keys(FORMS).map((k) => '<option value="' + k + '"' + (m.form === k ? ' selected' : '') + '>' + esc(FORMS[k].name) + '</option>').join('');
+  return '<h2>' + (isNew ? '重機を追加' : '重機を編集') + '</h2>'
+    + '<div class="row"><span>表示名（必ず）</span><input id="me-label" maxlength="40" value="' + esc(m.label || '') + '" placeholder="例：㊿ 0.25"></div>'
+    + '<div class="row"><span>種類</span><input id="me-type" maxlength="40" value="' + esc(m.type || '') + '" placeholder="例：油圧ショベル"></div>'
+    + '<div class="row"><span>メーカー</span><input id="me-mfr" maxlength="30" value="' + esc(m.mfr || '') + '"></div>'
+    + '<div class="row"><span>型式</span><input id="me-model" maxlength="40" value="' + esc(m.model || '') + '"></div>'
+    + '<div class="row"><span>車体番号</span><input id="me-serial" maxlength="40" value="' + esc(m.serial || '') + '"></div>'
+    + '<div class="row"><span>点検票の種類</span><select id="me-form">' + fopts + '</select></div>'
+    + '<div class="row"><span>状態</span><label><input type="checkbox" id="me-off"' + (m.off ? ' checked' : '') + '> 使用停止（売却・返却など。QRを読んでも点検票が出なくなります。記録は残ります）</label></div>'
+    + '<div class="msg info small">点検票の種類を変えても、前の記録は消えません。月の点検表では、前の点検票にしかない項目は「その他」に出ます。</div>'
+    + '<div id="me-err" class="small" style="color:var(--ng)"></div>'
+    + '<div class="foot"><button class="btn" data-act="close">やめる</button><button class="btn primary" data-act="m-save" data-mid="' + esc(isNew ? '' : m.id) + '">保存</button></div>';
+}
+async function saveMachine(mid, btn) {
+  const err = $('#me-err');
+  const v = (id) => $('#' + id).value.trim();
+  const data = { label: v('me-label'), type: v('me-type'), mfr: v('me-mfr'), model: v('me-model'), serial: v('me-serial'), form: v('me-form') };
+  if (!data.label) { err.textContent = '表示名を入れてください'; return; }
+  // 保存はサーバーの最新の一覧に対して、この1台だけを変える（ほかの人がその間に足した重機を消さない）
+  const off = $('#me-off').checked;
+  btn.disabled = true;
+  try {
+    const co = await withTimeout(B.updateCompany(AD.tk, (cur) => {
+      const list = cur.machines;
+      if (list.some((m) => m.id !== mid && m.label === data.label)) throw new Error('同じ表示名の重機があります');
+      if (mid) {
+        const i = list.findIndex((m) => m.id === mid);
+        if (i < 0) throw new Error('この重機が見つかりません（ほかの人が変えた可能性があります）');
+        list[i] = Object.assign({}, list[i], data);
+        if (off) list[i].off = true; else delete list[i].off;
+      } else {
+        if (list.length >= 300) throw new Error('重機は300台までです');
+        let id; do { id = 'm' + randId(6); } while (list.some((m) => m.id === id));
+        const nm = Object.assign({ id }, data); if (off) nm.off = true;
+        list.push(nm);
+      }
+      return { name: cur.name, machines: list };
+    }), NET_TIMEOUT_MS);
+    AD.co.name = co.name; AD.co.machines = co.machines; AD.co.mids = co.mids;
+    closeModal(); toast('保存しました'); showTab('machines');
+  } catch (e) { btn.disabled = false; err.textContent = '保存できませんでした：' + errText(e); }
+}
+async function printQr(ids) {
+  const ms = ids.map(mBy).filter(Boolean);
+  if (!ms.length) { toast('印刷する重機を選んでください'); return; }
+  try { await loadQrLib(); } catch (e) { toast(errText(e), 5000); return; }
+  const pages = [];
+  for (let i = 0; i < ms.length; i += 10) pages.push(ms.slice(i, i + 10));
+  const html = pages.map((pg) => '<div class="qr-page' + (AD.cut ? ' cut' : '') + '">' + pg.map((m) => qrLabelHtml(m)).join('') + '</div>').join('');
+  printHtml(html, 'size: A4 portrait; margin: 0;');
+}
+// 表示名の大きさ：右の欄（約40mm）に収まるように。全角1文字＝1、半角＝0.55 として幅を見積もる
+function labelPt(label) {
+  const em = Array.from(String(label)).reduce((a, c) => a + (/[\x20-\x7e]/.test(c) ? 0.55 : 1), 0) || 1;
+  return Math.max(10, Math.min(21, Math.floor(39 / (em * 0.3528))));
+}
+function qrLabelHtml(m) {
+  return '<div class="qlabel"><div class="qimg">' + qrSvg(machineUrl(AD.tk, m.id)) + '</div><div class="qt"><div class="q1">始業前点検</div><div class="q2" style="font-size:' + labelPt(m.label) + 'pt">' + esc(m.label) + '</div>'
+    + '<div class="q3">' + esc(m.type || '') + '<br>' + esc([m.mfr, m.model].filter(Boolean).join(' ')) + '</div>'
+    + '<div class="q4">スマホのカメラでQRコードを読み取り、使う前に点検を入力してください。</div><div class="q5">' + esc(AD.co.name) + '</div></div></div>';
+}
+
+/* ----- 設定 ----- */
+async function tabSettings() {
+  const main = $('#a-main');
+  let h = '<div class="set-sec"><h3>会社名</h3><input type="text" id="st-name" maxlength="40" value="' + esc(AD.co.name) + '" style="width:min(360px,100%)"> <button class="btn" data-act="st-name">保存</button></div>';
+  h += '<div class="set-sec"><h3>編集できる人（この管理画面を使える人）</h3><div id="st-eds" class="muted">読み込み中…</div>'
+    + '<div style="margin-top:8px"><input type="email" id="st-ed-new" placeholder="追加するメールアドレス（Google アカウント）" style="width:min(360px,100%)"> <button class="btn" data-act="ed-add">追加</button></div></div>';
+  h += '<div class="set-sec"><h3>点検の記録を Excel 用に書き出す（CSV）</h3><input type="month" id="st-csv-m" value="' + esc(AD.month) + '"> <button class="btn" data-act="csv">書き出す</button>'
+    + '<p class="small muted">1行が1回の点検です。Excel でそのまま開けます。</p></div>';
+  h += '<div class="set-sec"><h3>点検の入口（QRコードが読めないとき）</h3><p class="small">重機の一覧から選んで点検票を開く画面です。事務所や詰所に貼っておく・LINE で送る、などに使えます。</p>'
+    + '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div class="qrbox" id="st-qr"></div><div style="flex:1;min-width:240px"><div class="url">' + esc(entranceUrl(AD.tk)) + '</div><button class="btn sm" data-act="copy-entrance" style="margin-top:6px">URLをコピー</button></div></div>'
+    + '<p class="small muted">このURL・重機のQRコードを知っている人は、点検の入力と重機の一覧を見ることができます（記録を見ることはできません）。社外には渡さないでください。</p></div>';
+  h += '<div class="set-sec help"><h3>使い方</h3><ol>'
+    + '<li>「重機・QR」タブで QR ラベルを印刷し、運転席から見える所・ドアの内側などに貼る。</li>'
+    + '<li>作業員は、使う前にスマホのカメラで QR を読み取り、項目ごとに ○△×－ を選んで「送信する」。名前と現場はスマホが覚えるので、2回目からは入力不要。</li>'
+    + '<li>「×（悪い）」があると、その場で「使わないで連絡」と表示され、この画面の「不良・対応」タブに出る。直したら対応内容を書いて「対応済み」にする。</li>'
+    + '<li>「月の点検表」タブで、重機ごとの1か月分を紙の点検表の形で印刷できる（元請への提出・現場保管用）。</li>'
+    + '<li>重機を買った・レンタルした時は「＋ 重機を追加」→ QR を印刷。手放した重機は「使用停止」にする（記録は残る）。</li>'
+    + '</ol></div>';
+  main.innerHTML = h;
+  loadQrLib().then(() => { const b = $('#st-qr'); if (b) b.innerHTML = qrSvg(entranceUrl(AD.tk)); }).catch(() => { const b = $('#st-qr'); if (b) b.textContent = '（QRを作れませんでした）'; });
+  renderEditors();
+}
+async function renderEditors() {
+  const box = $('#st-eds'); if (!box) return;
+  try {
+    const eds = await withTimeout(B.getAcl(AD.tk), NET_TIMEOUT_MS);
+    AD.editors = eds;
+    box.classList.remove('muted');
+    box.innerHTML = '<ul class="eds">' + eds.map((e) => '<li><span style="flex:1">' + esc(e) + (e === AD.user.email ? '（あなた）' : '') + '</span>' + (e === AD.user.email ? '' : '<button class="btn sm danger" data-act="ed-del" data-e="' + esc(e) + '">外す</button>') + '</li>').join('') + '</ul>';
+  } catch (e) { box.textContent = '読み込めませんでした：' + errText(e); }
+}
+// 編集できる人は、サーバーの最新の一覧に対して足す・外す（ほかの人が同じ時に変えた分を消さない）
+async function saveEditors(mutate) {
+  try { await withTimeout(B.updateAcl(AD.tk, mutate), NET_TIMEOUT_MS); toast('保存しました'); renderEditors(); }
+  catch (e) { toast('保存できませんでした：' + errText(e), 5000); }
+}
+// Excel が式として読まないように、= + - @ などで始まる文字には ' を付ける（作業員の入力はログインなしで来るため）
+function csvCell(v) {
+  let s = String(v == null ? '' : v);
+  if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+async function exportCsv(ym) {
+  const recs = sortRecs(await B.listRecords(AD.tk, 'ym', ym));
+  if (!recs.length) { toast('この月の点検はありません'); return; }
+  const keys = []; Object.values(FORMS).forEach((f) => f.secs.forEach((s) => s[1].forEach((k) => { if (!keys.includes(k)) keys.push(k); })));
+  recs.forEach((r) => Object.keys(r.res || {}).forEach((k) => { if (!keys.includes(k)) keys.push(k); }));
+  const head = ['日付', '時刻', '重機', '種類', 'メーカー', '型式', '点検者', '現場', 'アワーメーター', '結果', '△の数', '×の数'].concat(keys.map(itemShort), ['気づいたこと・悪いところ', '対応', '対応済み', '後から送信（届いた日時）']);
+  const rows = [head];
+  recs.forEach((r) => {
+    const m = mBy(r.mid) || {}; const c = countMarks(r.res);
+    rows.push([r.date, r.t, m.label || r.label, m.type || '', m.mfr || '', m.model || '', r.by, r.site || '', r.hour != null ? r.hour : '', r.ng ? '不良あり' : '異常なし', c.a, c.x]
+      .concat(keys.map((k) => (r.res && r.res[k] && MARKS[r.res[k]] ? MARKS[r.res[k]].s : '')), [r.note || '', r.fix || '', r.fixDone ? '済' : '', lateText(r)]));
+  });
+  const text = '﻿' + rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
+  a.download = '重機点検_' + ym + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+/* ----- 事務所の画面のクリック ----- */
+async function onAdminClick(e) {
+  const tabBtn = e.target.closest('[data-tab]');
+  if (tabBtn) { showTab(tabBtn.dataset.tab); return; }
+  const recEl = e.target.closest('[data-rec]');
+  if (recEl && !e.target.closest('textarea')) {
+    const r = AD.recCache[recEl.dataset.rec]; if (r) openModal(recordDetailHtml(r)); return;
+  }
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const act = b.dataset.act;
+  if (act === 'login') return doLogin();
+  if (act === 'logout') { if (!B.isDemo) { await B.logout(); } return; }
+  if (act === 'setup') return doSetup(b);
+  if (act === 'close') return closeModal();
+  if (act === 'reload') { if (AD.tab === 'ng') refreshNgCount(); return showTab(AD.tab); }
+  if (act === 'day') { const n = Number(b.dataset.n); AD.date = n === 0 ? ymd() : addDaysStr(AD.date, n); AD.followToday = AD.date === ymd(); return showTab('today'); }
+  if (act === 'failed-clear') { lsDel(FAILED); updatePendingNote(); return; }
+  if (act === 'month') { AD.month = addMonthsStr(AD.month, Number(b.dataset.n)); return showTab('sheet'); }
+  if (act === 'print-sheet') { const sh = $('#s-body .sheet'); if (!sh) return; printHtml(sh.outerHTML, 'size: A4 landscape; margin: 8mm;'); return; }
+  if (act === 'print-month') { try { await printMonthAll(); } catch (er) { toast('読み込めませんでした：' + errText(er), 5000); } return; }
+  if (act === 'del-rec') {
+    const rid = b.dataset.rid; const r = AD.recCache[rid];
+    if (!confirm('この点検の記録を削除しますか？（' + (r ? r.label + ' ' + r.date + ' ' + r.t + ' ' + r.by : '') + '）\n削除すると元に戻せません。')) return;
+    try { await withTimeout(B.deleteRecord(AD.tk, rid), NET_TIMEOUT_MS); closeModal(); toast('削除しました'); showTab(AD.tab); refreshNgCount(); }
+    catch (er) { toast('削除できませんでした：' + errText(er), 5000); }
+    return;
+  }
+  if (act === 'fix-save') return saveFix(b.dataset.rid, null);
+  if (act === 'fix-done') return saveFix(b.dataset.rid, b.dataset.v === '1');
+  if (act === 'm-add') return openModal(machineEditHtml({ form: 'ex', type: '油圧ショベル' }, true));
+  if (act === 'm-edit') { const m = mBy(b.dataset.mid); if (m) openModal(machineEditHtml(m, false)); return; }
+  if (act === 'm-save') return saveMachine(b.dataset.mid, b);
+  if (act === 'qr-sel') return printQr($$('.m-chk').filter((c) => c.checked).map((c) => c.value));
+  if (act === 'qr-all') return printQr(machinesSorted(false).map((m) => m.id));
+  if (act === 'st-name') {
+    const name = $('#st-name').value.trim(); if (!name) { toast('会社名を入れてください'); return; }
+    try {
+      const co = await withTimeout(B.updateCompany(AD.tk, (cur) => ({ name, machines: cur.machines })), NET_TIMEOUT_MS);
+      AD.co.name = co.name; AD.co.machines = co.machines; AD.co.mids = co.mids; toast('保存しました'); renderAdmin();
+    }
+    catch (er) { toast('保存できませんでした：' + errText(er), 5000); }
+    return;
+  }
+  if (act === 'ed-add') {
+    const add = parseEmails($('#st-ed-new').value); if (!add.length) { toast('メールアドレスを入れてください'); return; }
+    return saveEditors((eds) => {
+      add.forEach((x) => { if (!eds.includes(x)) eds.push(x); });
+      if (eds.length > 50) throw new Error('編集できる人は50人までです');
+      return eds;
+    });
+  }
+  if (act === 'ed-del') {
+    const x = b.dataset.e; if (!confirm(x + ' を編集できる人から外しますか？')) return;
+    return saveEditors((eds) => eds.filter((y) => y !== x));
+  }
+  if (act === 'csv') { try { await exportCsv($('#st-csv-m').value || AD.month); } catch (er) { toast('書き出せませんでした：' + errText(er), 5000); } return; }
+  if (act === 'copy-entrance') { try { await navigator.clipboard.writeText(entranceUrl(AD.tk)); toast('コピーしました'); } catch (er) { toast('コピーできませんでした'); } }
+}
+function onAdminChange(e) {
+  const t = e.target;
+  if (t.id === 't-date' && t.value) { AD.date = t.value; AD.followToday = AD.date === ymd(); showTab('today'); }
+  else if (t.id === 's-mid') { AD.mid = t.value; showTab('sheet'); }
+  else if (t.id === 's-month' && t.value) { AD.month = t.value; showTab('sheet'); }
+  else if (t.id === 'ng-all') { AD.ngAll = t.checked; showTab('ng'); }
+  else if (t.id === 'q-cut') { AD.cut = t.checked; }
+  else if (t.id === 'm-chkall') { $$('.m-chk').forEach((c) => { c.checked = t.checked; }); }
+}
+
+/* =====================================================================
+   はじめ
+   ===================================================================== */
+// 不良・対応の書きかけを覚える
+function onAdminInput(e) { const t = e.target; if (t.matches && t.matches('.ngcard textarea[data-rid]')) AD.drafts[t.dataset.rid] = t.value; }
+// 開いたまま日付が変わった時：管理の「今日の点検」と作業員の画面の点検日を今日にする
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  const today = ymd();
+  if (AD.co && AD.followToday && AD.date !== today) { AD.date = today; if (AD.tab === 'today' && !$('#modal')) showTab('today'); }
+  const wd = $('.w-date');
+  if (wd && W.m && !W.done) {
+    wd.textContent = '点検日　' + jpDate(today);
+    const b = $('#w-banner'); if (b) b.outerHTML = bannerHtml(lsGet(lastKey(P_K, W.m.id), null)); // 「今日は点検済み」も今日で見直す
+  }
+});
+function boot() {
+  if (P_K) {
+    if (!KEY_RE.test(P_K)) { document.body.className = 'worker'; return renderError('QRコードが読み取れませんでした', 'もう一度、QRコードを読み取ってください。'); }
+    app.addEventListener('click', onWorkerClick);
+    if (params.has('m')) workerMain(); else pickerMain();
+  } else {
+    app.addEventListener('click', onAdminClick);
+    app.addEventListener('change', onAdminChange);
+    app.addEventListener('input', onAdminInput);
+    adminMain();
+  }
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+}
+boot();
+</script>
+</body>
+</html>

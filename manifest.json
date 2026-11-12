@@ -1,0 +1,18 @@
+{
+  "name": "重機 点検票 - 大田原工業",
+  "short_name": "重機点検",
+  "description": "重機に貼ったQRコードから始業前点検を入力する",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f3ef",
+  "theme_color": "#1f3b57",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
