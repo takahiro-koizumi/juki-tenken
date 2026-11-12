@@ -151,6 +151,10 @@ body.admin { font-size: 15px; }
 .tag.done { background: #e3e7eb; color: #4a5560; }
 .trow .s { font-size: 13px; color: var(--sub); }
 .trow .m { font-size: 14px; margin-top: 2px; }
+.trow .ck { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #e0e3e0; font-size: 14px; }
+.trow .ck .btn { min-height: 36px; }
+.ck-ok { color: var(--ok); font-weight: 700; }
+.ck-no { color: var(--adj); font-weight: 700; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .chips span { background: #e6e9ec; border-radius: 14px; padding: 2px 10px; font-size: 13px; }
 details.none-list { margin-top: 16px; background: var(--card); border-radius: 10px; padding: 10px 14px; }
@@ -230,6 +234,10 @@ table.mtable { border-collapse: collapse; width: 100%; background: var(--card); 
 .sheet .sh-grid tr.vt td .v.long { font-size: 5.6pt; }
 .sheet .sh-grid tr.vt td .v.num { text-orientation: mixed; letter-spacing: 0; }
 .sheet .sh-grid tr.stamp td { height: 8mm; }
+.sheet .sh-grid tr.ck td .cn { line-height: 1.1; white-space: nowrap; letter-spacing: -.03em; font-weight: 600; }
+.sheet .sh-grid tr.ck td .cn.s2 { font-size: 7.5pt; }
+.sheet .sh-grid tr.ck td .cn.s3, .sheet .sh-grid tr.ck td .cn.s6 { font-size: 6pt; }
+.sheet .sh-grid tr.ck td .cn.s4 { font-size: 7pt; }
 .sheet .sh-grid tr.fr th, .sheet .sh-grid tr.fr td.it { background: #f6f7f8; }
 .sheet .sh-notes { margin-top: 1.5mm; }
 .sheet .sh-notes .nh { display: flex; justify-content: space-between; align-items: baseline; gap: 4mm; font-size: 7pt; margin-bottom: .5mm; }
@@ -461,6 +469,15 @@ function lsGet(k, def) { try { const v = localStorage.getItem(LS_PREFIX + k); re
 function lsSet(k, v) { try { localStorage.setItem(LS_PREFIX + k, JSON.stringify(v)); return true; } catch (e) { return false; } }
 function lsDel(k) { try { localStorage.removeItem(LS_PREFIX + k); } catch (e) { /* なにもしない */ } }
 function normEmail(s) { return String(s || '').trim().toLowerCase(); }
+// 職長（点検を確認する人）の一覧 tenkenChk/{tk} の形をそろえる：{checkers: [メール], cnames: {メール: 名前}}
+function normChk(d) {
+  return {
+    checkers: d && Array.isArray(d.checkers) ? d.checkers.slice() : [],
+    cnames: d && d.cnames && typeof d.cnames === 'object' ? Object.assign({}, d.cnames) : {},
+  };
+}
+// 届いた・確認した日時（ms）を「8:15」、日がちがえば「11/13 8:15」に
+function atText(ms, date) { if (!ms) return ''; const d = new Date(ms); return (ymd(d) !== date ? (d.getMonth() + 1) + '/' + d.getDate() + ' ' : '') + hm(d); }
 function randId(n) { const c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'; const a = new Uint8Array(n); crypto.getRandomValues(a); return Array.from(a, (x) => c[x % c.length]).join(''); }
 function errText(e) {
   if (isCode(e, 'permission-denied')) return '権限がありません';
@@ -589,7 +606,7 @@ const Fire = {
   async listRecords(tk, field, value) {
     const F = this.F;
     const snap = await F.getDocsFromServer(F.query(F.collection(this.db, 'tenken', tk, 'records'), F.where(field, '==', value)));
-    return snap.docs.map((d) => { const x = d.data(); return Object.assign({}, x, { id: d.id, at: toMs(x.at), fixAt: toMs(x.fixAt) }); });
+    return snap.docs.map((d) => { const x = d.data(); return Object.assign({}, x, { id: d.id, at: toMs(x.at), fixAt: toMs(x.fixAt), chkAt: toMs(x.chkAt) }); });
   },
   async updateFix(tk, rid, fix) {
     await this.F.updateDoc(this.F.doc(this.db, 'tenken', tk, 'records', rid), Object.assign({}, fix, { fixAt: this.F.serverTimestamp() }));
@@ -606,6 +623,33 @@ const Fire = {
       return editors;
     });
   },
+  // ----- 職長（点検を確認する人）tenkenChk/{tk} = {checkers: [メール], cnames: {メール: 名前}} -----
+  // ログインした人が職長として入っている会社（ルール：職長本人だけが読める）
+  async findMyCheckCompanies(email) {
+    const F = this.F;
+    const snap = await F.getDocsFromServer(F.query(F.collection(this.db, 'tenkenChk'), F.where('checkers', 'array-contains', email), F.limit(10)));
+    return snap.docs.map((d) => ({ tk: d.id, chk: normChk(d.data()) }));
+  },
+  async getChk(tk) { const s = await this.F.getDocFromServer(this.F.doc(this.db, 'tenkenChk', tk)); return normChk(s.exists() ? s.data() : null); },
+  // 職長の一覧を、サーバーの最新に対して mutate で変える（トランザクション。管理する人だけ）
+  async updateChk(tk, mutate) {
+    const F = this.F, ref = F.doc(this.db, 'tenkenChk', tk);
+    return F.runTransaction(this.db, async (tx) => {
+      const s = await tx.get(ref);
+      const next = normChk(mutate(normChk(s.exists() ? s.data() : null)));
+      tx.set(ref, next);
+      return next;
+    });
+  },
+  // 職長の確認（ルール：確認していない記録に、登録された自分の名前とメールアドレスだけ書ける）
+  async confirmRecord(tk, rid, by, email) {
+    await this.F.updateDoc(this.F.doc(this.db, 'tenken', tk, 'records', rid), { chkBy: by, chkE: email, chkAt: this.F.serverTimestamp() });
+  },
+  // 確認の取り消し（ルール：確認した本人か管理する人）
+  async unconfirmRecord(tk, rid) {
+    const F = this.F;
+    await F.updateDoc(F.doc(this.db, 'tenken', tk, 'records', rid), { chkBy: F.deleteField(), chkE: F.deleteField(), chkAt: F.deleteField() });
+  },
 };
 
 // お試し：本物と同じ約束ごと（記録は作るだけ・圏外の間は返事を待ち続ける）をまねる。window.jtDemo.offline=true で圏外
@@ -613,7 +657,10 @@ window.jtDemo = window.jtDemo || { offline: false };
 const DEMO_DB = 'demo_db';
 const Demo = {
   isDemo: true,
-  _db() { const d = lsGet(DEMO_DB, null); return d && d.co ? d : { co: {}, acl: {}, rec: {}, last: {} }; },
+  _db() { const d = lsGet(DEMO_DB, null); if (d && d.co) { d.chk = d.chk || {}; return d; } return { co: {}, acl: {}, chk: {}, rec: {}, last: {} }; },
+  // お試しでログインしている人（jt_demo_user にメールアドレスを入れると、その人として開く＝職長の画面を試せる）
+  _me() { return normEmail(lsGet('demo_user', '')) || 'demo@example.com'; },
+  _isAdmin(d, tk) { return ((d.acl[tk] || {}).editors || []).includes(this._me()); },
   _put(d) { if (!lsSet(DEMO_DB, d)) throw new Error('この端末に保存できませんでした（容量がいっぱい）'); },
   async _wait() { await sleep(150); if (window.jtDemo.offline) throw Object.assign(new Error('お試し：圏外'), { code: 'unavailable' }); },
   _perm() { return Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' }); },
@@ -644,7 +691,7 @@ const Demo = {
     })();
   },
   async recordExists(tk, rid) { await this._wait(); return !!(this._db().rec[tk] || {})[rid]; },
-  onAuth(cb) { setTimeout(() => cb({ email: 'demo@example.com', name: 'お試し' }), 0); return () => {}; },
+  onAuth(cb) { setTimeout(() => cb({ email: this._me(), name: 'お試し' }), 0); return () => {}; },
   login() { return Promise.resolve(); },
   logout() { toast('お試しモードではログアウトはありません'); return Promise.resolve(); },
   async findMyCompanies(email) { await this._wait(); const d = this._db(); return Object.keys(d.acl).filter((k) => (d.acl[k].editors || []).includes(email)); },
@@ -675,6 +722,24 @@ const Demo = {
   async updateAcl(tk, mutate) {
     await this._wait(); const d = this._db(); const editors = mutate(d.acl[tk] ? d.acl[tk].editors.slice() : []);
     d.acl[tk] = { editors: editors.slice() }; this._put(d); return editors;
+  },
+  async findMyCheckCompanies(email) { await this._wait(); const d = this._db(); return Object.keys(d.chk).filter((k) => normChk(d.chk[k]).checkers.includes(email)).map((k) => ({ tk: k, chk: normChk(d.chk[k]) })); },
+  async getChk(tk) { await this._wait(); const d = this._db(); if (!this._isAdmin(d, tk)) throw this._perm(); return normChk(d.chk[tk]); },
+  async updateChk(tk, mutate) {
+    await this._wait(); const d = this._db(); if (!this._isAdmin(d, tk)) throw this._perm();
+    const next = normChk(mutate(normChk(d.chk[tk]))); d.chk[tk] = next; this._put(d); return normChk(next);
+  },
+  // ルールと同じ：職長だけ・確認していない記録だけ・登録された名前だけ
+  async confirmRecord(tk, rid, by, email) {
+    await this._wait(); const d = this._db(); const r = (d.rec[tk] || {})[rid]; const c = normChk(d.chk[tk]); const me = this._me();
+    if (!r || email !== me || !c.checkers.includes(me) || !by || c.cnames[me] !== by || r.chkE) throw this._perm();
+    Object.assign(r, { chkBy: by, chkE: me, chkAt: Date.now() }); this._put(d);
+  },
+  // ルールと同じ：確認した本人か管理する人だけ
+  async unconfirmRecord(tk, rid) {
+    await this._wait(); const d = this._db(); const r = (d.rec[tk] || {})[rid]; const me = this._me();
+    if (!r || !r.chkE || !(this._isAdmin(d, tk) || (normChk(d.chk[tk]).checkers.includes(me) && r.chkE === me))) throw this._perm();
+    delete r.chkBy; delete r.chkE; delete r.chkAt; this._put(d);
   },
 };
 const B = FIREBASE_CONFIG ? Fire : Demo;
@@ -1006,7 +1071,29 @@ const IN_APP = /\bLine\//.test(UA) ? 'LINE' : /FBAN|FBAV|FB_IAB|Instagram/.test(
 // seq：タブを読み込むたびに1つ増やす。古い読み込みの結果で新しい表示を上書きしないため
 // followToday：「今日の点検」が今日を見ている（日付を自分で変えていない）なら、日付が変わった時に追いかける
 // drafts：不良・対応の書きかけ（ほかのカードを保存して描き直しても消えないように）
-const AD = { user: null, tk: '', co: null, tab: 'today', date: ymd(), month: ymd().slice(0, 7), mid: '', ngAll: false, cut: true, recCache: {}, seq: 0, followToday: true, drafts: {} };
+// role：'admin'（編集できる人）／'checker'（職長。今日の点検・月の点検表を見て「確認」だけできる）
+// chkName：ログインした人が職長として登録されていれば、その名前（確認のボタンを出す）。site：今日の点検の現場の絞り込み
+const AD = { user: null, role: 'admin', tk: '', co: null, chk: null, chkName: '', site: '', tab: 'today', date: ymd(), month: ymd().slice(0, 7), mid: '', ngAll: false, cut: true, recCache: {}, seq: 0, followToday: true, drafts: {} };
+function setChk(c) {
+  AD.chk = normChk(c);
+  const e = AD.user ? AD.user.email : '';
+  AD.chkName = AD.chk.checkers.includes(e) ? String(AD.chk.cnames[e] || '') : '';
+}
+// 職長の登録をサーバーから読み直す（名前が変わった・外された時）。確認のボタンや見出しが変わったら描き直す
+async function refreshMyChk() {
+  const before = AD.chkName;
+  try {
+    if (AD.role === 'checker') {
+      const cks = await withTimeout(B.findMyCheckCompanies(AD.user.email), NET_TIMEOUT_MS);
+      const hit = cks.find((x) => x.tk === AD.tk);
+      if (!hit) { location.reload(); return; } // 職長から外された（開き直すと「登録されていません」）
+      setChk(hit.chk);
+    } else {
+      setChk(await withTimeout(B.getChk(AD.tk), NET_TIMEOUT_MS));
+    }
+  } catch (e) { return; }
+  if (AD.chkName !== before && AD.co) renderAdmin();
+}
 
 async function adminMain() {
   document.body.className = 'admin';
@@ -1023,16 +1110,37 @@ async function adminMain() {
     if (!user) return renderLogin();
     renderLoading('確認しています…');
     try {
+      AD.site = lsGet('t_site', '');
       const tks = await withTimeout(B.findMyCompanies(user.email), NET_TIMEOUT_MS);
       if (tks.length) {
         const pref = lsGet('admin_tk', '');
         AD.tk = tks.includes(pref) ? pref : tks[0];
         lsSet('admin_tk', AD.tk);
+        AD.role = 'admin';
         AD.co = await withTimeout(B.getCompany(AD.tk), NET_TIMEOUT_MS);
         if (!AD.co) return renderError('会社の登録が見つかりません', 'もう一度開き直してください。');
         AD.mid = (AD.co.machines[0] || {}).id || '';
+        setChk(null);
         renderAdmin();
         openMachineFromHash(); // 配置ボードの「点検の記録を見る」から来た時（#m=重機ID）
+        refreshMyChk(); // 管理する人が職長も兼ねているか（あとから読む。読めなくても管理の画面はそのまま）
+        return;
+      }
+      // 職長として登録されている人（ルールを公開する前の古い設定で断られた時は「登録されていない」として扱う）
+      let cks = [];
+      try { cks = await withTimeout(B.findMyCheckCompanies(user.email), NET_TIMEOUT_MS); }
+      catch (e) { if (!isCode(e, 'permission-denied')) throw e; }
+      if (cks.length) {
+        const pref = lsGet('chk_tk', '');
+        const hit = cks.find((x) => x.tk === pref) || cks[0];
+        AD.tk = hit.tk; lsSet('chk_tk', AD.tk);
+        AD.role = 'checker'; setChk(hit.chk);
+        AD.co = await withTimeout(B.getCompany(AD.tk), NET_TIMEOUT_MS);
+        if (!AD.co) return renderError('会社の登録が見つかりません', 'もう一度開き直してください。');
+        AD.mid = (AD.co.machines[0] || {}).id || '';
+        AD.tab = 'today';
+        renderAdmin();
+        openMachineFromHash();
         return;
       }
       if (await withTimeout(B.canSetup(), NET_TIMEOUT_MS)) return renderSetup();
@@ -1060,7 +1168,7 @@ async function doLogin() {
   }
 }
 function renderNotRegistered() {
-  app.innerHTML = demoBar() + '<div class="login-box"><h1>登録されていません</h1><p>' + esc(AD.user.email) + ' は、重機 点検票の「編集できる人」に入っていません。</p><p class="muted">管理している人に、設定タブの「編集できる人」へ追加してもらってください。</p><button class="btn" data-act="logout">ログアウト</button></div>';
+  app.innerHTML = demoBar() + '<div class="login-box"><h1>登録されていません</h1><p>' + esc(AD.user.email) + ' は、重機 点検票の「編集できる人」にも「職長」にも入っていません。</p><p class="muted">管理している人に、設定タブの「編集できる人」か「職長」へ追加してもらってください。</p><button class="btn" data-act="logout">ログアウト</button></div>';
 }
 function renderSetup() {
   app.innerHTML = demoBar() + '<div class="login-box"><h1>はじめての登録</h1>'
@@ -1093,17 +1201,22 @@ async function doSetup(btn) {
 }
 
 const TABS = [['today', '今日の点検'], ['sheet', '月の点検表'], ['ng', '不良・対応'], ['machines', '重機・QR'], ['settings', '設定']];
+// 職長は「今日の点検」と「月の点検表」だけ
+const CHECKER_TABS = [['today', '今日の点検'], ['sheet', '月の点検表']];
+function myTabs() { return AD.role === 'checker' ? CHECKER_TABS : TABS; }
 function renderAdmin() {
-  let h = demoBar() + '<header class="a-head"><div class="t">重機 点検票<span>管理</span></div><div class="co">' + esc(AD.co.name) + '</div>'
-    + '<div class="u"><span>' + esc(AD.user.email) + '</span>' + (B.isDemo ? '' : '<button class="btn" data-act="logout">ログアウト</button>') + '</div></header>';
-  h += '<nav class="tabs">' + TABS.map(([k, t]) => '<button data-tab="' + k + '"' + (AD.tab === k ? ' class="on"' : '') + '>' + esc(t) + (k === 'ng' ? '<span class="cnt hidden" id="ng-cnt"></span>' : '') + '</button>').join('') + '</nav>';
+  const ck = AD.role === 'checker';
+  let h = demoBar() + '<header class="a-head"><div class="t">重機 点検票<span>' + (ck ? '職長の確認' : '管理') + '</span></div><div class="co">' + esc(AD.co.name) + '</div>'
+    + '<div class="u"><span>' + (AD.chkName ? esc(AD.chkName) + '（職長）　' : '') + esc(AD.user.email) + '</span>' + (B.isDemo ? '' : '<button class="btn" data-act="logout">ログアウト</button>') + '</div></header>';
+  h += '<nav class="tabs">' + myTabs().map(([k, t]) => '<button data-tab="' + k + '"' + (AD.tab === k ? ' class="on"' : '') + '>' + esc(t) + (k === 'ng' ? '<span class="cnt hidden" id="ng-cnt"></span>' : '') + '</button>').join('') + '</nav>';
   h += '<div id="pending-note" class="msg warn hidden" style="margin:10px 16px 0"></div><main id="a-main"></main>';
   app.innerHTML = h;
   updatePendingNote();
   showTab(AD.tab);
-  refreshNgCount();
+  if (!ck) refreshNgCount();
 }
 function showTab(tab) {
+  if (!myTabs().some((x) => x[0] === tab)) tab = 'today';
   AD.tab = tab;
   $$('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
   const fn = { today: tabToday, sheet: tabSheet, ng: tabNg, machines: tabMachines, settings: tabSettings }[tab];
@@ -1126,9 +1239,13 @@ async function tabToday(seq) {
   main.innerHTML = '<div class="toolbar"><button class="btn" data-act="day" data-n="-1">◀ 前の日</button><input type="date" id="t-date" value="' + esc(AD.date) + '"><button class="btn" data-act="day" data-n="1">次の日 ▶</button>'
     + '<button class="btn" data-act="day" data-n="0">今日</button><span class="sp"></span><button class="btn" data-act="reload">↻ 最新にする</button></div><div id="t-body"><div class="loading"><div class="spinner"></div></div></div>';
   const date = AD.date;
-  const recs = sortRecs(await B.listRecords(AD.tk, 'date', date));
+  const allRecs = sortRecs(await B.listRecords(AD.tk, 'date', date));
   if (seq !== AD.seq) return;
-  AD.recCache = {}; recs.forEach((r) => { AD.recCache[r.id] = r; });
+  AD.recCache = {}; allRecs.forEach((r) => { AD.recCache[r.id] = r; });
+  // 現場で絞り込む（職長が自分の現場の重機だけを見るため。選んだ現場は端末が覚える）
+  const sites = []; allRecs.forEach((r) => { if (r.site && !sites.includes(r.site)) sites.push(r.site); });
+  if (AD.site && !sites.includes(AD.site)) sites.push(AD.site);
+  const recs = AD.site ? allRecs.filter((r) => r.site === AD.site) : allRecs;
   const byM = {}; recs.forEach((r) => { (byM[r.mid] = byM[r.mid] || []).push(r); });
   const order = (AD.co.machines || []).map((m) => m.id);
   // その日に1回でも「×」があれば不良として扱う（あとの点検で全部○にしても、先の×を見落とさないように）
@@ -1138,8 +1255,15 @@ async function tabToday(seq) {
     return order.indexOf(a) - order.indexOf(b);
   });
   const ngN = mids.filter(anyNg).length;
-  let h = '<div class="stat"><div class="ok"><b>' + mids.length + '</b>台 点検済み</div><div class="ng"><b>' + ngN + '</b>台 不良あり</div><div><b>' + recs.length + '</b>件の記録</div></div>';
-  if (!mids.length) h += '<div class="empty">' + esc(jpDate(date)) + ' の点検はまだありません。</div>';
+  const unchk = mids.filter((id) => !byM[id][byM[id].length - 1].chkBy).length;
+  let h = '';
+  if (sites.length > 1 || AD.site) {
+    h += '<div class="toolbar"><label class="small">現場 <select id="t-site"><option value="">すべての現場</option>'
+      + sites.map((x) => '<option value="' + esc(x) + '"' + (x === AD.site ? ' selected' : '') + '>' + esc(x) + '</option>').join('') + '</select></label></div>';
+  }
+  h += '<div class="stat"><div class="ok"><b>' + mids.length + '</b>台 点検済み</div><div class="ng"><b>' + ngN + '</b>台 不良あり</div>'
+    + '<div' + (unchk ? ' style="color:var(--adj)"' : '') + '><b>' + unchk + '</b>台 職長が未確認</div><div><b>' + recs.length + '</b>件の記録</div></div>';
+  if (!mids.length) h += '<div class="empty">' + esc(jpDate(date)) + ' の点検は' + (AD.site ? '（' + esc(AD.site) + '）' : '') + 'まだありません。</div>';
   else {
     h += '<div class="tlist">';
     mids.forEach((mid) => {
@@ -1150,13 +1274,65 @@ async function tabToday(seq) {
         + (earlierNg.length ? '<div class="m" style="color:var(--ng)">' + earlierNg.map((x) => esc(x.t) + ' ' + esc(x.by)).join('、') + ' の点検で「×」あり（「不良・対応」タブ）</div>' : '')
         + '<div class="s">' + esc(machineSub(m)) + '</div>'
         + '<div class="m">' + esc(r.t) + '　' + esc(r.by) + (r.site ? '　／ ' + esc(r.site) : '') + (r.hour != null ? '　／ ' + esc(r.hour) + 'h' : '') + (lateText(r) ? '　<span class="tag adj">後から送信 ' + esc(lateText(r)) + '</span>' : '') + '</div>'
-        + (r.note ? '<div class="s" style="white-space:pre-wrap">' + esc(r.note) + '</div>' : '') + '</div>';
+        + (r.note ? '<div class="s" style="white-space:pre-wrap">' + esc(r.note) + '</div>' : '') + chkRowHtml(list) + '</div>';
     });
     h += '</div>';
   }
-  const none = machinesSorted(false).filter((m) => !byM[m.id]);
+  const none = AD.site ? [] : machinesSorted(false).filter((m) => !byM[m.id]);
   if (none.length) h += '<details class="none-list"><summary>点検の記録がない重機 ' + none.length + ' 台（その日に使っていない重機も含みます）</summary><div class="chips">' + none.map((m) => '<span>' + esc(m.label) + '</span>').join('') + '</div></details>';
   $('#t-body').innerHTML = h;
+}
+
+// 職長の確認の欄（その日のいちばん新しい点検について。確認するとき・取り消すとき）
+function canUnconfirm(r) { return !!(r && r.chkE && (AD.role === 'admin' || (AD.chkName && r.chkE === AD.user.email))); }
+function chkRowHtml(list) {
+  const r = list[list.length - 1];
+  let h = '<div class="ck">';
+  if (r.chkBy) {
+    h += '<span class="ck-ok">✔ 職長確認 ' + esc(r.chkBy) + '</span><span class="small muted">' + esc(atText(r.chkAt, r.date)) + '</span>';
+    if (canUnconfirm(r)) h += '<button class="btn sm" data-act="unchk" data-rid="' + esc(r.id) + '">取り消す</button>';
+  } else {
+    h += '<span class="ck-no">職長 未確認</span>';
+    const c = list.filter((x) => x.chkBy).pop();
+    if (c) h += '<span class="small muted">（' + esc(c.t) + ' の点検は ' + esc(c.chkBy) + ' が確認）</span>';
+    if (AD.chkName) h += '<button class="btn sm primary" data-act="chk" data-rid="' + esc(r.id) + '">確認する</button>';
+  }
+  return h + '</div>';
+}
+async function doConfirm(rid, btn) {
+  if (!AD.chkName) return;
+  const r = AD.recCache[rid];
+  const dayNg = r && Object.values(AD.recCache).some((x) => x.mid === r.mid && x.date === r.date && x.ng);
+  if (dayNg && !confirm((r.ng ? '「×（悪い）」がある点検です。' : 'この日の前の点検に「×（悪い）」があります。') + '\n悪いところを確かめ、使わない・直す手配をしたうえで確認しますか？')) return;
+  btn.disabled = true;
+  try {
+    await withTimeout(B.confirmRecord(AD.tk, rid, AD.chkName, AD.user.email), NET_TIMEOUT_MS);
+    if (r) Object.assign(r, { chkBy: AD.chkName, chkE: AD.user.email, chkAt: Date.now() });
+    toast('確認しました'); closeModal(); showTab(AD.tab);
+  } catch (e) {
+    btn.disabled = false;
+    if (isCode(e, 'permission-denied')) {
+      toast('確認できませんでした。ほかの職長が先に確認したか、職長の登録が変わった可能性があります。', 6000);
+      closeModal(); showTab(AD.tab); refreshMyChk();
+    } else if (isCode(e, 'timeout')) {
+      // 送信は端末に残っていて、電波が戻ると届くことがある
+      toast('通信に時間がかかっています。電波が戻ると確認が届くことがあります。少し待って「↻ 最新にする」で確かめてください。', 7000);
+    } else toast('確認できませんでした：' + errText(e), 5000);
+  }
+}
+async function doUnconfirm(rid, btn) {
+  const r = AD.recCache[rid];
+  if (!confirm('職長の確認を取り消しますか？' + (r ? '（' + r.label + ' ' + r.date + ' ' + r.t + '　確認：' + (r.chkBy || '') + '）' : ''))) return;
+  btn.disabled = true;
+  try {
+    await withTimeout(B.unconfirmRecord(AD.tk, rid), NET_TIMEOUT_MS);
+    if (r) { delete r.chkBy; delete r.chkE; delete r.chkAt; }
+    toast('取り消しました'); closeModal(); showTab(AD.tab);
+  } catch (e) {
+    btn.disabled = false;
+    if (isCode(e, 'timeout')) toast('通信に時間がかかっています。電波が戻ると取り消しが届くことがあります。少し待って「↻ 最新にする」で確かめてください。', 7000);
+    else { toast('取り消せませんでした：' + errText(e), 5000); if (isCode(e, 'permission-denied')) { closeModal(); showTab(AD.tab); } }
+  }
 }
 
 /* ----- 配置ボードなどから「この重機の記録」を開く（#m=重機ID） -----
@@ -1176,7 +1352,7 @@ async function openMachineFromHash() {
     const recs = sortRecs((await withTimeout(B.listRecords(AD.tk, 'date', ymd()), NET_TIMEOUT_MS)).filter((r) => r.mid === mid));
     if (!recs.length) { toast(m.label + '：今日の点検はまだありません（月の点検表を出しています）', 4000); return; }
     const r = recs[recs.length - 1];
-    AD.recCache[r.id] = r;
+    recs.forEach((x) => { AD.recCache[x.id] = x; });
     const earlierNg = recs.slice(0, -1).filter((x) => x.ng);
     openModal((recs.length > 1 ? '<div class="msg info small">今日は ' + recs.length + ' 回点検されています。いちばん新しい点検を出しています（ほかは「今日の点検」タブ）。'
       + (earlierNg.length ? '<br><b style="color:var(--ng)">' + earlierNg.map((x) => esc(x.t) + ' ' + esc(x.by)).join('、') + ' の点検で「×」がありました。</b>' : '') + '</div>' : '') + recordDetailHtml(r));
@@ -1203,7 +1379,10 @@ function recordDetailHtml(r) {
   h += '</table>';
   if (r.note) h += '<div class="msg ' + (r.ng ? 'err' : 'info') + '" style="white-space:pre-wrap"><b>' + (r.ng ? '悪いところ' : '気づいたこと') + '：</b>' + esc(r.note) + '</div>';
   if (r.fix || r.fixDone) h += '<div class="msg info" style="white-space:pre-wrap"><b>対応' + (r.fixDone ? '（済み）' : '') + '：</b>' + esc(r.fix || '') + (r.fixBy ? '<br><span class="small muted">' + esc(r.fixBy) + '</span>' : '') + '</div>';
-  h += '<div class="foot"><button class="btn danger" data-act="del-rec" data-rid="' + esc(r.id) + '">この記録を削除</button><button class="btn primary" data-act="close">閉じる</button></div>';
+  h += r.chkBy ? '<div class="msg info"><b>職長の確認：</b>' + esc(r.chkBy) + '（' + esc(atText(r.chkAt, r.date)) + '）</div>' : '<div class="msg warn"><b>職長の確認：</b>まだ</div>';
+  h += '<div class="foot">' + (AD.role === 'admin' ? '<button class="btn danger" data-act="del-rec" data-rid="' + esc(r.id) + '">この記録を削除</button>' : '')
+    + (r.chkBy ? (canUnconfirm(r) ? '<button class="btn" data-act="unchk" data-rid="' + esc(r.id) + '">確認を取り消す</button>' : '') : (AD.chkName ? '<button class="btn primary" data-act="chk" data-rid="' + esc(r.id) + '">確認する</button>' : ''))
+    + '<button class="btn' + (r.chkBy || !AD.chkName ? ' primary' : '') + '" data-act="close">閉じる</button></div>';
   return h;
 }
 function openModal(html) {
@@ -1281,7 +1460,20 @@ function sheetHtml(m, ym, recsIn) {
   const shortName = (s) => { const t = Array.from(String(s || '').replace(/[・･\s　]/g, '')); return t.length > 8 ? t.slice(0, 7).join('') + '…' : t.join(''); };
   h += footRow('点検者', (r) => shortName(r.by), 'vt nm', false);
   h += footRow('アワーメーター（h）', (r) => (r.hour != null ? r.hour : ''), 'vt hr', true);
-  h += footRow('確認（職長）', () => '', 'stamp', false);
+  // 職長の確認：その日の点検を職長が確認していれば名前（表に載せた最後の点検の確認を先に見る）
+  const recsOfDay = {}; recs.forEach((r) => { const d = Number(r.date.slice(8, 10)); (recsOfDay[d] = recsOfDay[d] || []).push(r); });
+  const dayChk = (d) => { const last = byDay[d]; if (last && last.chkBy) return last.chkBy; const c = (recsOfDay[d] || []).filter((x) => x.chkBy).pop(); return c ? c.chkBy : ''; };
+  // 名前は横書き（3文字までは1行、4〜6文字は2行）。欄の高さは前のハンコ欄（8mm）のまま
+  let ckRow = '<tr class="fr stamp ck"><td class="it" colspan="2" style="text-align:center;font-weight:600">確認（職長）</td>';
+  for (let d = 1; d <= 31; d++) {
+    if (d > days) { ckRow += '<td class="nd"></td>'; continue; }
+    const nm = Array.from(String(dayChk(d)).replace(/[・･\s　]/g, '')).slice(0, 6);
+    if (!nm.length) { ckRow += '<td></td>'; continue; }
+    const cut = nm.length <= 3 ? nm.length : Math.ceil(nm.length / 2);
+    const lines = [nm.slice(0, cut).join(''), nm.slice(cut).join('')].filter(Boolean);
+    ckRow += '<td><div class="cn ' + (nm.length <= 2 ? 's2' : nm.length === 3 ? 's3' : nm.length === 4 ? 's4' : 's6') + '">' + lines.map(esc).join('<br>') + '</div></td>';
+  }
+  h += ckRow + '</tr>';
   h += '</tbody></table>';
   const notes = [];
   recs.forEach((r) => {
@@ -1292,6 +1484,12 @@ function sheetHtml(m, ym, recsIn) {
     if (parts.length) notes.push(mo + '/' + d + ' ' + r.t + ' ' + r.by + '：' + parts.join('　'));
   });
   Object.keys(cnt).forEach((d) => { if (cnt[d] > 1) notes.push(mo + '/' + d + ' は ' + cnt[d] + ' 回点検（表は最後の点検）'); });
+  // 最後の点検は未確認で、その前の点検を職長が確認している日
+  Object.keys(recsOfDay).forEach((d) => {
+    const list = recsOfDay[d]; const last = list[list.length - 1];
+    const c = last.chkBy ? null : list.filter((x) => x.chkBy).pop();
+    if (c) notes.push(mo + '/' + d + ' は ' + c.t + ' の点検を ' + c.chkBy + ' が確認（最後の ' + last.t + ' の点検は未確認）');
+  });
   const cols = notes.length > 8 ? ' cols3' : notes.length > 3 ? ' cols2' : '';
   h += '<div class="sh-notes"><div class="nh"><b>備考</b><span>○ 良い　△ 調整・補充した　× 悪い（使用禁止）　－ 装置なし　★ 法定の作業開始前点検（安衛則170条・クレーン則78条）　／　重機 点検票（スマホ入力）より作成</span></div>'
     + '<div class="nb' + cols + '">' + notes.map((n) => '<div>' + esc(n) + '</div>').join('') + '</div></div>';
@@ -1451,6 +1649,12 @@ async function tabSettings() {
   let h = '<div class="set-sec"><h3>会社名</h3><input type="text" id="st-name" maxlength="40" value="' + esc(AD.co.name) + '" style="width:min(360px,100%)"> <button class="btn" data-act="st-name">保存</button></div>';
   h += '<div class="set-sec"><h3>編集できる人（この管理画面を使える人）</h3><div id="st-eds" class="muted">読み込み中…</div>'
     + '<div style="margin-top:8px"><input type="email" id="st-ed-new" placeholder="追加するメールアドレス（Google アカウント）" style="width:min(360px,100%)"> <button class="btn" data-act="ed-add">追加</button></div></div>';
+  h += '<div class="set-sec"><h3>職長（点検を確認する人）</h3>'
+    + '<p class="small">職長は自分のスマホでこの画面（下のURL）を開き、Google でログインします。職長には「今日の点検」と「月の点検表」だけが出ます。点検の中身を見て「確認する」を押すと、月の点検表の「確認（職長）」欄にここで入れた名前が入ります（重機・設定の変更や記録の削除はできません）。</p>'
+    + '<div id="st-cks" class="muted">読み込み中…</div>'
+    + '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input type="text" id="st-ck-name" maxlength="6" placeholder="名前（苗字。例：山田）" style="width:170px"><input type="email" id="st-ck-mail" placeholder="職長の Google アカウントのメールアドレス" style="width:min(330px,100%)"><button class="btn" data-act="ck-add">追加</button></div>'
+    + '<p class="small muted">名前は月の点検表の細い欄に縦に入るので、苗字だけ（6文字まで）にしてください。同じメールアドレスで追加し直すと名前が変わります（確認済みの記録の名前は変わりません）。管理する人が自分で確認する時は、自分もここに入れてください。</p>'
+    + '<div class="url">' + esc(appUrl()) + '</div><button class="btn sm" data-act="copy-admin" style="margin-top:6px">職長に送るURLをコピー</button></div>';
   h += '<div class="set-sec"><h3>点検の記録を Excel 用に書き出す（CSV）</h3><input type="month" id="st-csv-m" value="' + esc(AD.month) + '"> <button class="btn" data-act="csv">書き出す</button>'
     + '<p class="small muted">1行が1回の点検です。Excel でそのまま開けます。</p></div>';
   h += '<div class="set-sec"><h3>点検の入口（QRコードが読めないとき）</h3><p class="small">重機の一覧から選んで点検票を開く画面です。事務所や詰所に貼っておく・LINE で送る、などに使えます。</p>'
@@ -1460,12 +1664,35 @@ async function tabSettings() {
     + '<li>「重機・QR」タブで QR ラベルを印刷し、運転席から見える所・ドアの内側などに貼る。</li>'
     + '<li>作業員は、使う前にスマホのカメラで QR を読み取り、項目ごとに ○△×－ を選んで「送信する」。名前と現場はスマホが覚えるので、2回目からは入力不要。</li>'
     + '<li>「×（悪い）」があると、その場で「使わないで連絡」と表示され、この画面の「不良・対応」タブに出る。直したら対応内容を書いて「対応済み」にする。</li>'
-    + '<li>「月の点検表」タブで、重機ごとの1か月分を紙の点検表の形で印刷できる（元請への提出・現場保管用）。</li>'
+    + '<li>職長は自分のスマホでこの画面を開いて Google でログインし、「今日の点検」で中身を見て「確認する」を押す（上の「職長」に登録した人だけ）。</li>'
+    + '<li>「月の点検表」タブで、重機ごとの1か月分を紙の点検表の形で印刷できる（月末にファイリング・元請への提出用）。「確認（職長）」欄には職長が確認した名前が入る。</li>'
     + '<li>重機を買った・レンタルした時は「＋ 重機を追加」→ QR を印刷。手放した重機は「使用停止」にする（記録は残る）。</li>'
     + '</ol></div>';
   main.innerHTML = h;
   loadQrLib().then(() => { const b = $('#st-qr'); if (b) b.innerHTML = qrSvg(entranceUrl(AD.tk)); }).catch(() => { const b = $('#st-qr'); if (b) b.textContent = '（QRを作れませんでした）'; });
   renderEditors();
+  renderCheckers();
+}
+async function renderCheckers() {
+  const box = $('#st-cks'); if (!box) return;
+  try {
+    const c = await withTimeout(B.getChk(AD.tk), NET_TIMEOUT_MS);
+    setChk(c);
+    box.classList.remove('muted');
+    box.innerHTML = c.checkers.length
+      ? '<ul class="eds">' + c.checkers.map((e) => '<li><b style="min-width:5em">' + esc(c.cnames[e] || '（名前なし）') + '</b><span style="flex:1">' + esc(e) + (e === AD.user.email ? '（あなた）' : '') + '</span><button class="btn sm danger" data-act="ck-del" data-e="' + esc(e) + '">外す</button></li>').join('') + '</ul>'
+      : '<p class="small muted" style="margin:0 0 6px">まだだれも登録されていません。</p>';
+  } catch (e) { box.textContent = '読み込めませんでした：' + errText(e); }
+}
+// 職長は、サーバーの最新の一覧に対して足す・外す（ほかの人が同じ時に変えた分を消さない）
+async function saveCheckers(mutate) {
+  try {
+    const c = await withTimeout(B.updateChk(AD.tk, mutate), NET_TIMEOUT_MS);
+    const had = !!AD.chkName; setChk(c);
+    toast('保存しました');
+    if (had !== !!AD.chkName) renderAdmin(); else renderCheckers(); // 自分を職長に足した・外した時は見出しも変える
+    return true;
+  } catch (e) { toast('保存できませんでした：' + errText(e), 5000); return false; }
 }
 async function renderEditors() {
   const box = $('#st-eds'); if (!box) return;
@@ -1492,12 +1719,12 @@ async function exportCsv(ym) {
   if (!recs.length) { toast('この月の点検はありません'); return; }
   const keys = []; Object.values(FORMS).forEach((f) => f.secs.forEach((s) => s[1].forEach((k) => { if (!keys.includes(k)) keys.push(k); })));
   recs.forEach((r) => Object.keys(r.res || {}).forEach((k) => { if (!keys.includes(k)) keys.push(k); }));
-  const head = ['日付', '時刻', '重機', '種類', 'メーカー', '型式', '点検者', '現場', 'アワーメーター', '結果', '△の数', '×の数'].concat(keys.map(itemShort), ['気づいたこと・悪いところ', '対応', '対応済み', '後から送信（届いた日時）']);
+  const head = ['日付', '時刻', '重機', '種類', 'メーカー', '型式', '点検者', '現場', 'アワーメーター', '結果', '△の数', '×の数'].concat(keys.map(itemShort), ['気づいたこと・悪いところ', '対応', '対応済み', '後から送信（届いた日時）', '職長の確認', '確認した日時']);
   const rows = [head];
   recs.forEach((r) => {
     const m = mBy(r.mid) || {}; const c = countMarks(r.res);
     rows.push([r.date, r.t, m.label || r.label, m.type || '', m.mfr || '', m.model || '', r.by, r.site || '', r.hour != null ? r.hour : '', r.ng ? '不良あり' : '異常なし', c.a, c.x]
-      .concat(keys.map((k) => (r.res && r.res[k] && MARKS[r.res[k]] ? MARKS[r.res[k]].s : '')), [r.note || '', r.fix || '', r.fixDone ? '済' : '', lateText(r)]));
+      .concat(keys.map((k) => (r.res && r.res[k] && MARKS[r.res[k]] ? MARKS[r.res[k]].s : '')), [r.note || '', r.fix || '', r.fixDone ? '済' : '', lateText(r), r.chkBy || '', r.chkAt ? ymd(new Date(r.chkAt)) + ' ' + hm(new Date(r.chkAt)) : '']));
   });
   const text = '﻿' + rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
   const a = document.createElement('a');
@@ -1512,7 +1739,9 @@ async function onAdminClick(e) {
   const tabBtn = e.target.closest('[data-tab]');
   if (tabBtn) { showTab(tabBtn.dataset.tab); return; }
   const recEl = e.target.closest('[data-rec]');
-  if (recEl && !e.target.closest('textarea')) {
+  const actEl = e.target.closest('[data-act]');
+  // 行の中のボタン（確認する・取り消す）は、行を開かずにボタンの動きをする
+  if (recEl && !e.target.closest('textarea') && !(actEl && recEl.contains(actEl) && actEl !== recEl)) {
     const r = AD.recCache[recEl.dataset.rec]; if (r) openModal(recordDetailHtml(r)); return;
   }
   const b = e.target.closest('[data-act]');
@@ -1535,6 +1764,9 @@ async function onAdminClick(e) {
     catch (er) { toast('削除できませんでした：' + errText(er), 5000); }
     return;
   }
+  if (act === 'chk') return doConfirm(b.dataset.rid, b);
+  if (act === 'unchk') return doUnconfirm(b.dataset.rid, b);
+  if (AD.role !== 'admin') return; // ここから下は管理する人だけ
   if (act === 'fix-save') return saveFix(b.dataset.rid, null);
   if (act === 'fix-done') return saveFix(b.dataset.rid, b.dataset.v === '1');
   if (act === 'm-add') return openModal(machineEditHtml({ form: 'ex', type: '油圧ショベル' }, true));
@@ -1564,6 +1796,27 @@ async function onAdminClick(e) {
     return saveEditors((eds) => eds.filter((y) => y !== x));
   }
   if (act === 'csv') { try { await exportCsv($('#st-csv-m').value || AD.month); } catch (er) { toast('書き出せませんでした：' + errText(er), 5000); } return; }
+  if (act === 'ck-add') {
+    const name = $('#st-ck-name').value.replace(/[\s　]+/g, '');
+    const mails = parseEmails($('#st-ck-mail').value);
+    if (!name) { toast('名前を入れてください'); return; }
+    if (Array.from(name).length > 6) { toast('名前は6文字までにしてください（苗字だけ）'); return; }
+    if (mails.length !== 1) { toast('メールアドレスを1つ入れてください'); return; }
+    const em = mails[0];
+    const ok = await saveCheckers((c) => {
+      if (!c.checkers.includes(em)) c.checkers.push(em);
+      c.cnames[em] = name;
+      if (c.checkers.length > 100) throw new Error('職長は100人までです');
+      return c;
+    });
+    if (ok) { const a = $('#st-ck-name'), m = $('#st-ck-mail'); if (a) a.value = ''; if (m) m.value = ''; }
+    return;
+  }
+  if (act === 'ck-del') {
+    const x = b.dataset.e; if (!confirm(x + ' を職長から外しますか？（確認済みの記録はそのまま残ります）')) return;
+    return saveCheckers((c) => { c.checkers = c.checkers.filter((y) => y !== x); delete c.cnames[x]; return c; });
+  }
+  if (act === 'copy-admin') { try { await navigator.clipboard.writeText(appUrl()); toast('コピーしました'); } catch (er) { toast('コピーできませんでした'); } return; }
   if (act === 'copy-entrance') { try { await navigator.clipboard.writeText(entranceUrl(AD.tk)); toast('コピーしました'); } catch (er) { toast('コピーできませんでした'); } }
 }
 function onAdminChange(e) {
@@ -1571,6 +1824,7 @@ function onAdminChange(e) {
   if (t.id === 't-date' && t.value) { AD.date = t.value; AD.followToday = AD.date === ymd(); showTab('today'); }
   else if (t.id === 's-mid') { AD.mid = t.value; showTab('sheet'); }
   else if (t.id === 's-month' && t.value) { AD.month = t.value; showTab('sheet'); }
+  else if (t.id === 't-site') { AD.site = t.value; lsSet('t_site', AD.site); showTab('today'); }
   else if (t.id === 'ng-all') { AD.ngAll = t.checked; showTab('ng'); }
   else if (t.id === 'q-cut') { AD.cut = t.checked; }
   else if (t.id === 'm-chkall') { $$('.m-chk').forEach((c) => { c.checked = t.checked; }); }
