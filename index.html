@@ -1031,7 +1031,9 @@ async function adminMain() {
         AD.co = await withTimeout(B.getCompany(AD.tk), NET_TIMEOUT_MS);
         if (!AD.co) return renderError('会社の登録が見つかりません', 'もう一度開き直してください。');
         AD.mid = (AD.co.machines[0] || {}).id || '';
-        return renderAdmin();
+        renderAdmin();
+        openMachineFromHash(); // 配置ボードの「点検の記録を見る」から来た時（#m=重機ID）
+        return;
       }
       if (await withTimeout(B.canSetup(), NET_TIMEOUT_MS)) return renderSetup();
       renderNotRegistered();
@@ -1156,6 +1158,31 @@ async function tabToday(seq) {
   if (none.length) h += '<details class="none-list"><summary>点検の記録がない重機 ' + none.length + ' 台（その日に使っていない重機も含みます）</summary><div class="chips">' + none.map((m) => '<span>' + esc(m.label) + '</span>').join('') + '</div></details>';
   $('#t-body').innerHTML = h;
 }
+
+/* ----- 配置ボードなどから「この重機の記録」を開く（#m=重機ID） -----
+   その重機の月の点検表を出し、今日の記録があれば、いちばん新しい点検の中身も開く。
+   ボードは管理画面の窓を名前付きで使い回すので、2台目からは #m= だけが変わる（hashchange で切り替える） */
+function hashMid() { const m = location.hash.match(/^#m=([A-Za-z0-9_-]{1,24})$/); return m ? m[1] : ''; }
+async function openMachineFromHash() {
+  const mid = hashMid();
+  if (!mid || !AD.co) return;
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* 消せなくてもよい */ }
+  const m = mBy(mid);
+  if (!m) { toast('この重機は点検票に登録されていません'); return; }
+  closeModal();
+  AD.mid = mid; AD.month = ymd().slice(0, 7);
+  showTab('sheet');
+  try {
+    const recs = sortRecs((await withTimeout(B.listRecords(AD.tk, 'date', ymd()), NET_TIMEOUT_MS)).filter((r) => r.mid === mid));
+    if (!recs.length) { toast(m.label + '：今日の点検はまだありません（月の点検表を出しています）', 4000); return; }
+    const r = recs[recs.length - 1];
+    AD.recCache[r.id] = r;
+    const earlierNg = recs.slice(0, -1).filter((x) => x.ng);
+    openModal((recs.length > 1 ? '<div class="msg info small">今日は ' + recs.length + ' 回点検されています。いちばん新しい点検を出しています（ほかは「今日の点検」タブ）。'
+      + (earlierNg.length ? '<br><b style="color:var(--ng)">' + earlierNg.map((x) => esc(x.t) + ' ' + esc(x.by)).join('、') + ' の点検で「×」がありました。</b>' : '') + '</div>' : '') + recordDetailHtml(r));
+  } catch (e) { toast('読み込めませんでした：' + errText(e), 5000); }
+}
+window.addEventListener('hashchange', () => { if (AD.co) openMachineFromHash(); });
 
 /* ----- 記録の中身（モーダル） ----- */
 function recordDetailHtml(r) {
